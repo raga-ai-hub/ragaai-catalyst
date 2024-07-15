@@ -1,6 +1,6 @@
 # RagaAI Catalyst
 
-RagaAI Catalyst is a powerful tool for managing and optimizing Retrieval-Augmented Generation (RAG) projects. It provides functionalities for project management, trace recording, and experiment management, allowing you to fine-tune and evaluate your RAG applications effectively.
+RagaAI Catalyst is a powerful tool for managing and optimizing LLM projects. It provides functionalities for project management, trace recording, and experiment management, allowing you to fine-tune and evaluate your LLM applications effectively.
 
 ## Table of Contents
 

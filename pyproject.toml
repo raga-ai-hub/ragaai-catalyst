@@ -8,7 +8,7 @@ description = "RAGA AI CATALYST"
 readme = "README.md"
 requires-python = ">=3.9"
 # license = {file = "LICENSE"}
-dynamic = ["version"]
+version = "1.0.0"
 authors = [
     {name = "Kiran Scaria", email = "kiran.scaria@raga.ai"},
     {name = "Kedar Gaikwad", email = "kedar.gaikwad@raga.ai"},
@@ -32,8 +32,8 @@ dev = ["pytest", "pytest-cov", "black", "isort", "mypy", "flake8"]
 [tool.setuptools]
 packages = ["ragaai_catalyst"]
 
-[tool.setuptools_scm]
-write_to = "ragaai_catalyst/_version.py"
+# [tool.setuptools_scm]
+# write_to = "ragaai_catalyst/_version.py"
 
 [tool.black]
 line-length = 88
