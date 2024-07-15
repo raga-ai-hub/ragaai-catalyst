@@ -1,0 +1,67 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm>=6.2"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ragaai_catalyst"
+description = "RAGA AI CATALYST"
+readme = "README.md"
+requires-python = ">=3.9"
+# license = {file = "LICENSE"}
+dynamic = ["version"]
+authors = [
+    {name = "Kiran Scaria", email = "kiran.scaria@raga.ai"},
+    {name = "Kedar Gaikwad", email = "kedar.gaikwad@raga.ai"},
+    {name = "Dushyant Mahajan", email = "dushyant.mahajan@raga.ai"},
+]
+
+dependencies = [
+    "aiohttp~=3.9.5",
+    "opentelemetry-api~=1.25.0",
+    "opentelemetry-sdk~=1.25.0",
+    "opentelemetry-instrumentation~=0.46b0",
+    "opentelemetry-instrumentation-langchain~=0.24.0",
+    "langchain-core~=0.2.11",
+    "opentelemetry-instrumentation-openai~=0.24.0",
+    "openai~=1.35.10",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "black", "isort", "mypy", "flake8"]
+
+[tool.setuptools]
+packages = ["ragaai_catalyst"]
+
+[tool.setuptools_scm]
+write_to = "ragaai_catalyst/_version.py"
+
+[tool.black]
+line-length = 88
+target-version = ['py310']
+include = '\.pyi?$'
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+ignore_missing_imports = true
+strict = true
+
+[tool.pytest.ini_options]
+addopts = "--cov=ragaai_catalyst"
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["ragaai_catalyst"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self.debug:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass",
+    "except ImportError:",
+]
