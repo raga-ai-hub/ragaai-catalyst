@@ -7,7 +7,7 @@ logger = logging.getLogger("RagaAICatalyst")
 
 
 class RagaAICatalyst:
-    BASE_URL = "https://llm-platform.dev4.ragaai.ai/api"
+    BASE_URL = None
     TIMEOUT = 10  # Default timeout in seconds
 
     def __init__(
@@ -30,7 +30,11 @@ class RagaAICatalyst:
         self.access_key, self.secret_key = self._set_access_key_secret_key(
             access_key, secret_key
         )
-
+        RagaAICatalyst.BASE_URL = (
+            os.getenv("RAGAAI_CATALYST_BASE_URL")
+            if os.getenv("RAGAAI_CATALYST_BASE_URL")
+            else "https://llm-platform.dev4.ragaai.ai/api"
+        )
         os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
         os.environ["RAGAAI_CATALYST_SECRET_KEY"] = secret_key
 
@@ -82,7 +86,7 @@ class RagaAICatalyst:
         ]
         json_data = {"secrets": secrets}
         response = requests.post(
-            f"{self.BASE_URL}/v1/llm/secrets/upload",
+            f"{RagaAICatalyst.BASE_URL}/v1/llm/secrets/upload",
             headers=headers,
             json=json_data,
             timeout=RagaAICatalyst.TIMEOUT,
@@ -132,7 +136,7 @@ class RagaAICatalyst:
 
         try:
             response = requests.post(
-                f"{RagaAICatalyst.BASE_URL}/token",
+                f"{ RagaAICatalyst.BASE_URL}/token",
                 headers=headers,
                 json=json_data,
                 timeout=RagaAICatalyst.TIMEOUT,
@@ -194,7 +198,7 @@ class RagaAICatalyst:
         }
         try:
             response = requests.post(
-                f"{self.BASE_URL}/projects",
+                f"{RagaAICatalyst.BASE_URL}/projects",
                 headers=headers,
                 json=json_data,
                 timeout=self.TIMEOUT,
@@ -209,10 +213,12 @@ class RagaAICatalyst:
             if response.status_code == 401:
                 logger.warning("Received 401 error. Attempting to refresh token.")
                 self.get_token()
-                headers["Authorization"] = f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+                headers["Authorization"] = (
+                    f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+                )
                 try:
                     response = requests.post(
-                        f"{self.BASE_URL}/projects",
+                        f"{RagaAICatalyst.BASE_URL}/projects",
                         headers=headers,
                         json=json_data,
                         timeout=self.TIMEOUT,
@@ -264,7 +270,7 @@ class RagaAICatalyst:
         }
         try:
             response = requests.get(
-                f"{self.BASE_URL}/projects",
+                f"{RagaAICatalyst.BASE_URL}/projects",
                 params=params,
                 headers=headers,
                 timeout=self.TIMEOUT,
@@ -281,10 +287,12 @@ class RagaAICatalyst:
             if response.status_code == 401:
                 logger.warning("Received 401 error. Attempting to refresh token.")
                 self.get_token()
-                headers["Authorization"] = f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+                headers["Authorization"] = (
+                    f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+                )
                 try:
                     response = requests.get(
-                        f"{self.BASE_URL}/projects",
+                        f"{RagaAICatalyst.BASE_URL}/projects",
                         params=params,
                         headers=headers,
                         timeout=self.TIMEOUT,
@@ -328,7 +336,7 @@ class RagaAICatalyst:
         }
         try:
             response = requests.get(
-                f"{self.BASE_URL}/v1/llm/llm-metrics",
+                f"{RagaAICatalyst.BASE_URL}/v1/llm/llm-metrics",
                 headers=headers,
                 timeout=self.TIMEOUT,
             )
@@ -344,10 +352,12 @@ class RagaAICatalyst:
             if response.status_code == 401:
                 logger.warning("Received 401 error. Attempting to refresh token.")
                 self.get_token()
-                headers["Authorization"] = f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+                headers["Authorization"] = (
+                    f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
+                )
                 try:
                     response = requests.get(
-                        f"{self.BASE_URL}/v1/llm/llm-metrics",
+                        f"{RagaAICatalyst.BASE_URL}/v1/llm/llm-metrics",
                         headers=headers,
                         timeout=self.TIMEOUT,
                     )

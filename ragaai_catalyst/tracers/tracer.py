@@ -21,9 +21,7 @@ from .utils import get_unique_key
 logger = logging.getLogger(__name__)
 
 
-
 class Tracer:
-
 
     def __init__(
         self,
@@ -78,6 +76,7 @@ class Tracer:
             project_name=self.project_name,
             metadata=self.metadata,
             pipeline=self.pipeline,
+            raga_client=self.raga_client,
         )
         tracer_provider = trace_sdk.TracerProvider()
         tracer_provider.add_span_processor(SimpleSpanProcessor(self.filespanx))
@@ -167,19 +166,21 @@ class Tracer:
         """
         async with aiohttp.ClientSession() as session:
             if not os.getenv("RAGAAI_CATALYST_TOKEN"):
-                raise ValueError("RAGAAI_CATALYST_TOKEN not found. Cannot upload traces.")
+                raise ValueError(
+                    "RAGAAI_CATALYST_TOKEN not found. Cannot upload traces."
+                )
 
             try:
                 upload_stat = await asyncio.wait_for(
                     self.raga_client.check_and_upload_files(
                         session=session,
-                        file_paths=self.filespanx.sync_files,
+                        file_paths=[self.filespanx.sync_file],
                     ),
                     timeout=self.upload_timeout,
                 )
                 return (
                     "Files uploaded successfully"
-                    if upload_stat 
+                    if upload_stat
                     else "No files to upload"
                 )
             except asyncio.TimeoutError:
