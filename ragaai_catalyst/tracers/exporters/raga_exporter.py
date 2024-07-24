@@ -6,6 +6,7 @@ import logging
 from tqdm import tqdm
 import requests
 from ...ragaai_catalyst import RagaAICatalyst
+import shutil
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +14,7 @@ get_token = RagaAICatalyst.get_token
 
 
 class RagaExporter:
-    BASE_URL = "https://llm-platform.dev4.ragaai.ai/api"
+    BASE_URL = None
     SCHEMA_MAPPING = {
         "trace_id": "traceId",
         "trace_uri": "traceUri",
@@ -41,6 +42,11 @@ class RagaExporter:
             Exception: If the schema check fails or the schema creation fails.
         """
         self.project_name = project_name
+        RagaExporter.BASE_URL = (
+            os.getenv("RAGAAI_CATALYST_BASE_URL")
+            if os.getenv("RAGAAI_CATALYST_BASE_URL")
+            else "https://llm-platform.dev4.ragaai.ai/api"
+        )
         self.access_key = os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
         self.secret_key = os.getenv("RAGAAI_CATALYST_SECRET_KEY")
         self.max_urls = 20
@@ -58,9 +64,7 @@ class RagaExporter:
                     "Failed to create schema. Please consider raising an issue."
                 )
         elif status_code != 200:
-            raise Exception(
-                "Failed to check schema. Please consider raising an issue."
-            )
+            raise Exception("Failed to check schema. Please consider raising an issue.")
 
     def _check_schema(self):
         """
@@ -77,6 +81,7 @@ class RagaExporter:
         Raises:
             None
         """
+
         def make_request():
             headers = {
                 "authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
@@ -90,31 +95,32 @@ class RagaExporter:
 
         response = make_request()
         if response.status_code == 401:
-            get_token() # Fetch a new token and set it in the environment
+            get_token()  # Fetch a new token and set it in the environment
             response = make_request()  # Retry the request
         if response.status_code != 200:
             return response.status_code
         return response.status_code
-    
+
     def _create_schema(self):
         """
         Creates a schema for the project by making a POST request to the RagaExporter.BASE_URL endpoint.
-        
+
         This function makes a POST request to the RagaExporter.BASE_URL endpoint to create a schema for the project.
         It uses the project name and the schema mapping defined in RagaExporter.SCHEMA_MAPPING to construct the JSON data.
         The request includes the project name, schema mapping, and a trace folder URL set to None.
-        
+
         Parameters:
             self (RagaExporter): The instance of the RagaExporter class.
-        
+
         Returns:
             int: The status code of the response. If the response status code is 200, it means the schema was created successfully.
                  If the response status code is 401, it means the token is invalid and a new token is fetched and set in the environment.
                  If the response status code is not 200, it means the schema creation failed.
-        
+
         Raises:
             None
         """
+
         def make_request():
             headers = {
                 "Content-Type": "application/json",
@@ -129,9 +135,10 @@ class RagaExporter:
                 f"{RagaExporter.BASE_URL}/v1/llm/master-dataset",
                 headers=headers,
                 json=json_data,
-                timeout=RagaExporter.TIMEOUT
+                timeout=RagaExporter.TIMEOUT,
             )
             return response
+
         response = make_request()
         if response.status_code == 401:
             get_token()  # Fetch a new token and set it in the environment
@@ -160,6 +167,7 @@ class RagaExporter:
             aiohttp.ClientError: If the request fails.
 
         """
+
         async def make_request():
             json_data = {
                 "projectName": self.project_name,
@@ -191,14 +199,13 @@ class RagaExporter:
 
         return json_data
 
-    async def stream_trace(self, session, trace_uri, file_path):
+    async def stream_trace(self, session, trace_uri):
         """
         Asynchronously streams a trace to the RagaExporter API.
 
         Args:
             session (aiohttp.ClientSession): The aiohttp session to use for the request.
             trace_uri (str): The URI of the trace to stream.
-            file_path (str): The path to the file containing the trace.
 
         Returns:
             int: The status code of the response.
@@ -207,22 +214,22 @@ class RagaExporter:
             aiohttp.ClientError: If the request fails.
 
         """
+
         async def make_request():
 
-
             headers = {
-                'Authorization': f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-                'Content-Type': 'application/json',
+                "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "Content-Type": "application/json",
             }
 
             json_data = {
-                'projectName': self.project_name,
-                'traceUri': trace_uri,
+                "projectName": self.project_name,
+                "traceUri": trace_uri,
             }
 
-            async with session.post( 
-                f"{RagaExporter.BASE_URL}/v1/llm/insert/trace", 
-                headers=headers, 
+            async with session.post(
+                f"{RagaExporter.BASE_URL}/v1/llm/insert/trace",
+                headers=headers,
                 json=json_data,
                 timeout=RagaExporter.TIMEOUT,
             ) as response:
@@ -254,6 +261,7 @@ class RagaExporter:
         Returns:
             int: The status code of the response.
         """
+
         async def make_request():
 
             headers = {
@@ -264,10 +272,7 @@ class RagaExporter:
             with open(file_path) as f:
                 data = f.read().replace("\n", "").replace("\r", "").encode()
             async with session.put(
-                url, 
-                headers=headers, 
-                data=data,
-                timeout=RagaExporter.TIMEOUT
+                url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
             ) as response:
 
                 # print(json_response)
@@ -296,7 +301,7 @@ class RagaExporter:
 
         Returns:
             str: The status of the upload process.
-        """        """
+        """ """
         Asynchronously uploads a file using the given session, url, and file path.
 
         Args:
@@ -342,9 +347,7 @@ class RagaExporter:
                     trace_folder_urls.append(data.get("traceFolderUrl", []))
         else:
             # Fetch URLs for all files if under the limit
-            presigned_url_response = await self.get_presigned_url(
-                session, num_files
-            )
+            presigned_url_response = await self.get_presigned_url(session, num_files)
             if presigned_url_response.get("success") == True:
                 data = presigned_url_response.get("data", {})
                 presigned_urls += data.get("presignedUrls", [])
@@ -360,16 +363,29 @@ class RagaExporter:
                     continue
 
                 # Upload each file and collect the future tasks
-                upload_status =  await self.upload_file(session, presigned_url, file_path)
+                upload_status = await self.upload_file(
+                    session, presigned_url, file_path
+                )
                 if upload_status == 200:
                     logger.debug(
                         f"File '{os.path.basename(file_path)}' uploaded successfully."
                     )
-                    stream_status = await self.stream_trace(session, file_path, presigned_url)
+                    stream_status = await self.stream_trace(
+                        session, trace_uri=presigned_url
+                    )
                     if stream_status == 200:
                         logger.debug(
-                        f"File '{os.path.basename(file_path)}' streamed successfully."
-                    )
+                            f"File '{os.path.basename(file_path)}' streamed successfully."
+                        )
+                        shutil.move(
+                            file_path,
+                            os.path.join(
+                                os.path.dirname(file_path),
+                                "backup",
+                                os.path.basename(file_path).split(".")[0]
+                                + "_backup.json",
+                            ),
+                        )
                     else:
                         logger.error(
                             f"Failed to stream the file '{os.path.basename(file_path)}'."
@@ -378,7 +394,7 @@ class RagaExporter:
                     logger.error(
                         f"Failed to upload the file '{os.path.basename(file_path)}'."
                     )
-        
+
             return "upload successful"
 
         else:
@@ -389,19 +405,17 @@ class RagaExporter:
     async def tracer_stopsession(self, file_names):
         """
         Asynchronously stops the tracing session, checks for RAGAAI_CATALYST_TOKEN, and uploads files if the token is present.
-        
+
         Parameters:
             self: The current instance of the class.
             file_names: A list of file names to be uploaded.
-        
+
         Returns:
             None
         """
         async with aiohttp.ClientSession() as session:
             if os.getenv("RAGAAI_CATALYST_TOKEN"):
                 print("Token obtained successfully.")
-                await self.check_and_upload_files(
-                    session, file_paths=file_names
-                )
+                await self.check_and_upload_files(session, file_paths=file_names)
             else:
                 print("Failed to obtain token.")

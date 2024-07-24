@@ -4,13 +4,23 @@ from .utils import response_checker
 from typing import Union
 import logging
 from .ragaai_catalyst import RagaAICatalyst
+
 logger = logging.getLogger(__name__)
 get_token = RagaAICatalyst.get_token
+
+
 class Dataset:
-    BASE_URL = "https://llm-platform.dev4.ragaai.ai/api"
+    BASE_URL = None
     TIMEOUT = 10
+
     def __init__(self, project_name):
         self.project_name = project_name
+        Dataset.BASE_URL = (
+            os.getenv("RAGAAI_CATALYST_BASE_URL")
+            if os.getenv("RAGAAI_CATALYST_BASE_URL")
+            else "https://llm-platform.dev4.ragaai.ai/api"
+        )
+
     def list_datasets(self):
         """
         Retrieves a list of datasets for a given project.
@@ -21,6 +31,7 @@ class Dataset:
         Raises:
             None.
         """
+
         def make_request():
             headers = {
                 "accept": "application/json, text/plain, */*",
@@ -36,20 +47,21 @@ class Dataset:
                 timeout=Dataset.TIMEOUT,
             )
             return response
+
         response = make_request()
         response_checker(response, "Dataset.list_datasets")
         if response.status_code == 401:
-            get_token() # Fetch a new token and set it in the environment
+            get_token()  # Fetch a new token and set it in the environment
             response = make_request()  # Retry the request
         if response.status_code != 200:
             return {
                 "status_code": response.status_code,
                 "message": response.json(),
             }
-        datasets = response.json()['data']['content']
-        sub_datasets = [dataset['name'] for dataset in datasets]
+        datasets = response.json()["data"]["content"]
+        sub_datasets = [dataset["name"] for dataset in datasets]
         return sub_datasets
-    
+
     def create_dataset(self, dataset_name, filter_list):
         """
         Creates a new dataset with the given `dataset_name` and `filter_list`.
@@ -65,6 +77,7 @@ class Dataset:
             None
 
         """
+
         def make_request():
             headers = {
                 "Content-Type": "application/json",
@@ -82,12 +95,13 @@ class Dataset:
                 timeout=Dataset.TIMEOUT,
             )
             return response
+
         response = make_request()
         response_checker(response, "Dataset.create_dataset")
         if response.status_code == 401:
             get_token()  # Fetch a new token and set it in the environment
             response = make_request()  # Retry the request
         if response.status_code != 200:
-            return response.json()['message']
-        message = response.json()['message']
-        return f'{message} {dataset_name}'
+            return response.json()["message"]
+        message = response.json()["message"]
+        return f"{message} {dataset_name}"
