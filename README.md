@@ -32,7 +32,7 @@ from ragaai_catalyst import RagaAICatalyst
 catalyst = RagaAICatalyst(
     access_key="YOUR_ACCESS_KEY",
     secret_key="YOUR_SECRET_KEY",
-    api_key={"OPENAI_API_KEY": "YOUR_OPENAI_API_KEY"}
+    api_keys={"OPENAI_API_KEY": "YOUR_OPENAI_API_KEY"}
 )
 ```
 
@@ -101,16 +101,17 @@ experiment_manager = Experiment(
 # Add metrics to the experiment
 experiment_manager.add_metrics(
     metrics={
-        "hallucination": {"model": "gpt-4o"},
+        "name": "hallucination",
+        "config": {"model": "gpt-4o"},
     }
 )
 
 # Add multiple metrics
 experiment_manager.add_metrics(
     metrics=[
-        {"hallucination": {"model": "gpt-4o"}},
-        {"hallucination": {"model": "gpt-4"}},
-        {"hallucination": {"model": "gpt-3.5-turbo"}},
+        {"name": "hallucination", "config": {"model": "gpt-4o"}},
+        {"name": "hallucination", "config": {"model": "gpt-4"}},
+        {"name": "hallucination", "config": {"model": "gpt-3.5-turbo"}},
     ]
 )
 
