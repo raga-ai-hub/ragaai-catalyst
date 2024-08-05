@@ -85,6 +85,7 @@ class RagaExporter:
         def make_request():
             headers = {
                 "authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name,
             }
             response = requests.get(
                 f"{RagaExporter.BASE_URL}/v1/llm/master-dataset/schema/{self.project_name}",
@@ -125,6 +126,7 @@ class RagaExporter:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name,
             }
             json_data = {
                 "projectName": self.project_name,
@@ -176,6 +178,7 @@ class RagaExporter:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name,
             }
             async with session.get(
                 f"{RagaExporter.BASE_URL}/v1/llm/presigned-url",
@@ -220,6 +223,7 @@ class RagaExporter:
             headers = {
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
                 "Content-Type": "application/json",
+                "X-Project-Name": self.project_name,
             }
 
             json_data = {

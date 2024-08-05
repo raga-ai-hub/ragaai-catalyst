@@ -36,6 +36,7 @@ class Dataset:
             headers = {
                 "accept": "application/json, text/plain, */*",
                 "authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name
             }
             params = {
                 "projectName": self.project_name,
@@ -82,6 +83,7 @@ class Dataset:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name,
             }
             json_data = {
                 "projectName": self.project_name,
