@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 get_token = RagaAICatalyst.get_token
 
-def setup_logging(log_level=logging.INFO):
+def setup_logging(log_level=logging.DEBUG):
     """
     Set up logging for the RagaExporter package with console output only.
     
