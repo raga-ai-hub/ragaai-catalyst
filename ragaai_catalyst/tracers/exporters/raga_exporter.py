@@ -181,7 +181,6 @@ class RagaExporter:
         status_code = response.status
         return status_code
     
-
     async def get_presigned_url(self, session, num_files):
         """
         Asynchronously retrieves a presigned URL from the RagaExporter API.
@@ -229,7 +228,6 @@ class RagaExporter:
 
         return json_data
 
-    async def stream_trace(self, session, trace_uri):
         """
         Asynchronously streams a trace to the RagaExporter API.
 
@@ -370,9 +368,6 @@ class RagaExporter:
 
         logger.info(f"Successfully streamed trace. Status code: {status}")
         return status
-
-
-
 
     async def check_and_upload_files(self, session, file_paths):
         """
