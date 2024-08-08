@@ -433,7 +433,7 @@ class RagaExporter:
                 trace_folder_urls.append(data.get("traceFolderUrl", []))
 
         # If URLs were successfully obtained, start the upload process
-        logger.info("presigned urls"'{presigned_urls}')
+        logger.warning("presigned urls"'{presigned_urls}')
         if presigned_urls != []:
             for file_path, presigned_url in tqdm(
                 zip(file_paths, presigned_urls), desc="Uploading traces"
