@@ -7,6 +7,7 @@ from tqdm import tqdm
 import requests
 from ...ragaai_catalyst import RagaAICatalyst
 import shutil
+import traceback
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,7 @@ class RagaExporter:
         logger.debug(f"Function: {context} - Response: {response}")
         status_code = response.status
         return status_code
+    
 
     async def get_presigned_url(self, session, num_files):
         """
@@ -289,6 +291,60 @@ class RagaExporter:
             return response.status
 
         return response.status
+    
+    async def stream_trace(self, session, trace_uri):
+        """
+        Asynchronously streams a trace to the RagaExporter API.
+        """
+        async def make_request():
+            headers = {
+                "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "Content-Type": "application/json",
+            }
+
+            json_data = {
+                "projectName": self.project_name,
+                "traceUri": trace_uri,
+            }
+
+            logger.debug(f"Streaming trace with URI: {trace_uri}")
+            logger.debug(f"Request headers: {headers}")
+            logger.debug(f"Request payload: {json_data}")
+
+            try:
+                async with session.post(
+                    f"{RagaExporter.BASE_URL}/v1/llm/insert/trace",
+                    headers=headers,
+                    json=json_data,
+                    timeout=RagaExporter.TIMEOUT,
+                ) as response:
+                    status = response.status
+                    logger.debug(f"Stream trace response status: {status}")
+                    if status != 200:
+                        response_text = await response.text()
+                        logger.error(f"Stream trace error response: {response_text}")
+                    return response, status
+            except Exception as e:
+                logger.error(f"Exception during stream trace: {str(e)}")
+                logger.error(traceback.format_exc())
+                return None, 500
+
+        response, status = await make_request()
+        await self.response_checker_async(response, "RagaExporter.stream_trace")
+        if status == 401:
+            logger.warning("Token expired. Fetching new token.")
+            await get_token()
+            response, status = await make_request()
+
+        if status != 200:
+            logger.error(f"Failed to stream trace. Status code: {status}")
+            return status
+
+        logger.info(f"Successfully streamed trace. Status code: {status}")
+        return status
+
+
+
 
     async def check_and_upload_files(self, session, file_paths):
         """
@@ -354,46 +410,44 @@ class RagaExporter:
                 trace_folder_urls.append(data.get("traceFolderUrl", []))
 
         # If URLs were successfully obtained, start the upload process
+        
         if presigned_urls != []:
             for file_path, presigned_url in tqdm(
                 zip(file_paths, presigned_urls), desc="Uploading traces"
             ):
                 if not os.path.isfile(file_path):
-                    print(f"The file '{file_path}' does not exist.")
+                    logger.warning(f"The file '{file_path}' does not exist.")
                     continue
 
-                # Upload each file and collect the future tasks
+                logger.info(f"Attempting to upload file: {file_path}")
                 upload_status = await self.upload_file(
                     session, presigned_url, file_path
                 )
                 if upload_status == 200:
-                    logger.debug(
-                        f"File '{os.path.basename(file_path)}' uploaded successfully."
-                    )
+                    logger.info(f"File '{os.path.basename(file_path)}' uploaded successfully.")
+                    logger.info(f"Attempting to stream file: {file_path}")
                     stream_status = await self.stream_trace(
                         session, trace_uri=presigned_url
                     )
                     if stream_status == 200:
-                        logger.debug(
-                            f"File '{os.path.basename(file_path)}' streamed successfully."
-                        )
-                        shutil.move(
-                            file_path,
-                            os.path.join(
-                                os.path.dirname(file_path),
-                                "backup",
-                                os.path.basename(file_path).split(".")[0]
-                                + "_backup.json",
-                            ),
-                        )
+                        logger.info(f"File '{os.path.basename(file_path)}' streamed successfully.")
+                        try:
+                            shutil.move(
+                                file_path,
+                                os.path.join(
+                                    os.path.dirname(file_path),
+                                    "backup",
+                                    os.path.basename(file_path).split(".")[0]
+                                    + "_backup.json",
+                                ),
+                            )
+                            logger.info(f"File '{os.path.basename(file_path)}' moved to backup.")
+                        except Exception as e:
+                            logger.error(f"Failed to move file to backup: {str(e)}")
                     else:
-                        logger.error(
-                            f"Failed to stream the file '{os.path.basename(file_path)}'."
-                        )
+                        logger.error(f"Failed to stream the file '{os.path.basename(file_path)}'. Status code: {stream_status}")
                 else:
-                    logger.error(
-                        f"Failed to upload the file '{os.path.basename(file_path)}'."
-                    )
+                    logger.error(f"Failed to upload the file '{os.path.basename(file_path)}'. Status code: {upload_status}")
 
             return "upload successful"
 
