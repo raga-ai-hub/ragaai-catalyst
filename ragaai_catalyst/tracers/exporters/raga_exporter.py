@@ -13,6 +13,34 @@ logger = logging.getLogger(__name__)
 
 get_token = RagaAICatalyst.get_token
 
+def setup_logging(log_level=logging.INFO):
+    """
+    Set up logging for the RagaExporter package with console output only.
+    
+    Args:
+    log_level (int): The logging level to use. Defaults to logging.INFO.
+    
+    Returns:
+    logging.Logger: The configured logger object.
+    """
+    logger = logging.getLogger("raga_exporter")
+    logger.setLevel(log_level)
+
+    # Create a console handler
+    console_handler = logging.StreamHandler()
+    
+    # Create a formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    console_handler.setFormatter(formatter)
+
+    # Add the console handler to the logger
+    logger.addHandler(console_handler)
+
+    return logger
+
+logger = setup_logging(log_level=logging.DEBUG)
+
+
 
 class RagaExporter:
     BASE_URL = None
