@@ -47,7 +47,8 @@ class RagaAICatalyst:
             )
         self.api_keys = api_keys or {}
         self.get_token()
-        #self._upload_keys()
+        if self.api_keys:
+            self._upload_keys()
 
     def _set_access_key_secret_key(self, access_key, secret_key):
         os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
