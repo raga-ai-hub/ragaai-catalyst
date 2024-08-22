@@ -379,14 +379,14 @@ class RagaExporter:
                 upload_status = await self.upload_file(
                     session, presigned_url, file_path
                 )
-                if upload_status == 200:
+                if upload_status == 200 or upload_status == 201:
                     logger.debug(
                         f"File '{os.path.basename(file_path)}' uploaded successfully."
                     )
                     stream_status = await self.stream_trace(
                         session, trace_uri=presigned_url
                     )
-                    if stream_status == 200:
+                    if stream_status == 200 or stream_status == 201:
                         logger.debug(
                             f"File '{os.path.basename(file_path)}' streamed successfully."
                         )
