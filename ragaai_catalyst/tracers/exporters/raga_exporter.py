@@ -251,57 +251,6 @@ class RagaExporter:
 
         return response.status
 
-    async def upload_file(self, session, url, file_path):
-        """
-        Asynchronously uploads a file using the given session, url, and file path.
-        Supports both regular and Azure blob storage URLs.
-
-        Args:
-            self: The RagaExporter instance.
-            session (aiohttp.ClientSession): The aiohttp session to use for the request.
-            url (str): The URL to upload the file to.
-            file_path (str): The path to the file to upload.
-
-        Returns:
-            int: The status code of the response.
-        """
-
-        async def make_request():
-            headers = {
-                "Content-Type": "application/json",
-            }
-
-            if "blob.core.windows.net" in url:  # Azure
-                headers["x-ms-blob-type"] = "BlockBlob"
-
-            print(f"Uploading traces...")
-            logger.debug(f"Uploading file:{file_path} with url {url}")
-
-            with open(file_path, 'rb') as f:
-                data = f.read()
-
-            async with session.put(
-                    url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
-            ) as response:
-                status = response.status
-                return response, status
-
-        response, status = await make_request()
-        await self.response_checker_async(response, "RagaExporter.upload_file")
-
-        if response.status == 401:
-            await get_token()  # Fetch a new token and set it in the environment
-            response, status = await make_request()  # Retry the request
-
-        if response.status != 200 or response.status != 201:
-            raise aiohttp.ClientResponseError(
-                response.request_info,
-                response.history,
-                status=response.status,
-                message=f"Upload failed with status {response.status}"
-            )
-
-        return response.status
 
     async def check_and_upload_files(self, session, file_paths):
         """
@@ -328,7 +277,7 @@ class RagaExporter:
         """
         # Check if there are no files to upload
         if len(file_paths) == 0:
-            print("No files to be uploaded.")
+            logger.info("No files to be uploaded.")
             return None
 
         # Ensure a required environment token is available; if not, attempt to obtain it.
@@ -341,79 +290,69 @@ class RagaExporter:
         # Initialize lists for URLs and tasks
         presigned_urls = []
         trace_folder_urls = []
-        tasks_json = []
-        tasks_stream = []
-        # Determine the number of files to process
         num_files = len(file_paths)
 
-        # If number of files exceeds the maximum allowed URLs, fetch URLs in batches
-        if num_files > self.max_urls:
-            for i in range(
-                (num_files // self.max_urls) + 1
-            ):  # Correct integer division
-                presigned_url_response = await self.get_presigned_url(
-                    session, self.max_urls
-                )
-                if presigned_url_response.get("success") == True:
-                    data = presigned_url_response.get("data", {})
-                    presigned_urls += data.get("presignedUrls", [])
-                    trace_folder_urls.append(data.get("traceFolderUrl", []))
-        else:
-            # Fetch URLs for all files if under the limit
-            presigned_url_response = await self.get_presigned_url(session, num_files)
+        # Fetch presigned URLs
+        for i in range((num_files - 1) // self.max_urls + 1):
+            batch_size = min(self.max_urls, num_files - i * self.max_urls)
+            presigned_url_response = await self.get_presigned_url(session, batch_size)
             if presigned_url_response.get("success") == True:
                 data = presigned_url_response.get("data", {})
-                presigned_urls += data.get("presignedUrls", [])
-                trace_folder_urls.append(data.get("traceFolderUrl", []))
+                presigned_urls.extend(data.get("presignedUrls", []))
+                trace_folder_urls.append(data.get("traceFolderUrl"))
+            else:
+                logger.error(f"Failed to get presigned URLs for batch {i + 1}")
+                return None
 
-        # If URLs were successfully obtained, start the upload process
-        if presigned_urls != []:
-            for file_path, presigned_url in tqdm(
-                zip(file_paths, presigned_urls), desc="Uploading traces"
-            ):
-                if not os.path.isfile(file_path):
-                    print(f"The file '{file_path}' does not exist.")
-                    continue
-
-                # Upload each file and collect the future tasks
-                upload_status = await self.upload_file(
-                    session, presigned_url, file_path
-                )
-                if upload_status == 200 or upload_status == 201:
-                    logger.debug(
-                        f"File '{os.path.basename(file_path)}' uploaded successfully."
-                    )
-                    stream_status = await self.stream_trace(
-                        session, trace_uri=presigned_url
-                    )
-                    if stream_status == 200 or stream_status == 201:
-                        logger.debug(
-                            f"File '{os.path.basename(file_path)}' streamed successfully."
-                        )
-                        shutil.move(
-                            file_path,
-                            os.path.join(
-                                os.path.dirname(file_path),
-                                "backup",
-                                os.path.basename(file_path).split(".")[0]
-                                + "_backup.json",
-                            ),
-                        )
-                    else:
-                        logger.error(
-                            f"Failed to stream the file '{os.path.basename(file_path)}'."
-                        )
-                else:
-                    logger.error(
-                        f"Failed to upload the file '{os.path.basename(file_path)}'."
-                    )
-
-            return "upload successful"
-
-        else:
-            # Log failure if no presigned URLs could be obtained
-            print(f"Failed to get presigned URLs.")
+        if not presigned_urls:
+            logger.error("Failed to get any presigned URLs.")
             return None
+
+        # Upload and stream files
+        for file_path, presigned_url in tqdm(zip(file_paths, presigned_urls), total=num_files, desc="Uploading traces"):
+            if not os.path.isfile(file_path):
+                logger.warning(f"The file '{file_path}' does not exist.")
+                continue
+
+            try:
+                upload_status = await self.upload_file(session, presigned_url, file_path)
+                if upload_status in (200, 201):
+                    logger.debug(f"File '{os.path.basename(file_path)}' uploaded successfully.")
+                    stream_status = await self.stream_trace(session, trace_uri=presigned_url)
+                    if stream_status in (200, 201):
+                        logger.debug(f"File '{os.path.basename(file_path)}' streamed successfully.")
+                        self._backup_file(file_path)
+                    else:
+                        logger.error(f"Failed to stream the file '{os.path.basename(file_path)}'.")
+                else:
+                    logger.error(f"Failed to upload the file '{os.path.basename(file_path)}'.")
+            except Exception as e:
+                logger.error(f"Error processing file '{os.path.basename(file_path)}': {str(e)}")
+
+        return "Upload completed"
+
+    def _backup_file(self, file_path):
+        backup_dir = os.path.join(os.path.dirname(file_path), "backup")
+        os.makedirs(backup_dir, exist_ok=True)
+        backup_file = os.path.join(backup_dir, f"{os.path.basename(file_path).split('.')[0]}_backup.json")
+        shutil.move(file_path, backup_file)
+
+    async def upload_file(self, session, url, file_path):
+        headers = {"Content-Type": "application/json"}
+        if "blob.core.windows.net" in url:
+            headers["x-ms-blob-type"] = "BlockBlob"
+
+        logger.debug(f"Uploading file: {file_path} with URL: {url}")
+
+        async with aiohttp.ClientTimeout(total=self.TIMEOUT):
+            with open(file_path, 'rb') as f:
+                data = f.read()
+            async with session.put(url, headers=headers, data=data) as response:
+                status = response.status
+                if status not in (200, 201):
+                    logger.error(f"Upload failed with status {status}")
+                return status
+
 
     async def tracer_stopsession(self, file_names):
         """
@@ -426,9 +365,11 @@ class RagaExporter:
         Returns:
             None
         """
+
         async with aiohttp.ClientSession() as session:
             if os.getenv("RAGAAI_CATALYST_TOKEN"):
-                print("Token obtained successfully.")
-                await self.check_and_upload_files(session, file_paths=file_names)
+                logger.info("Token obtained successfully.")
+                result = await self.check_and_upload_files(session, file_paths=file_names)
+                logger.info(f"Upload process result: {result}")
             else:
-                print("Failed to obtain token.")
+                logger.error("Failed to obtain token.")

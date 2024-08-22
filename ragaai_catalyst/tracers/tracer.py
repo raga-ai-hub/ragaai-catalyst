@@ -57,6 +57,7 @@ class Tracer:
 
         self._tracer_provider = self._setup_provider()
         self._instrumentor = self._setup_instrumentor(tracer_type)
+        self.filespanx = None
         self.is_instrumented = False
         self._upload_task = None
 
@@ -78,9 +79,9 @@ class Tracer:
             pipeline=self.pipeline,
             raga_client=self.raga_client,
         )
-        tracer_provider = trace_sdk.TracerProvider()
-        tracer_provider.add_span_processor(SimpleSpanProcessor(self.filespanx))
-        return tracer_provider
+        self.tracer_provider = trace_sdk.TracerProvider()
+        self.tracer_provider.add_span_processor(SimpleSpanProcessor(self.filespanx))
+        return self.tracer_provider
 
     def _setup_instrumentor(self, tracer_type):
         instrumentors = {
@@ -109,6 +110,7 @@ class Tracer:
     def start(self):
         """Start the tracer."""
         if not self.is_instrumented:
+            self._setup_provider()
             self._instrumentor().instrument(tracer_provider=self._tracer_provider)
             self.is_instrumented = True
         print(f"Tracer started for project: {self.project_name}")
@@ -174,7 +176,7 @@ class Tracer:
                 upload_stat = await asyncio.wait_for(
                     self.raga_client.check_and_upload_files(
                         session=session,
-                        file_paths=[self.filespanx.sync_file],
+                        file_paths=[self.filespanx.sync_file] if self.filespanx else [],
                     ),
                     timeout=self.upload_timeout,
                 )
@@ -204,11 +206,10 @@ class Tracer:
             try:
                 self._instrumentor().uninstrument()
                 self._tracer_provider.shutdown()
-                self.is_instrumented = False
                 print("Tracer provider shut down successfully")
             except Exception as e:
                 logger.error(f"Error during tracer shutdown: {str(e)}")
 
         # Reset instrumentation flag
         self.is_instrumented = False
-        # Note: We're not resetting all attributes here to allow for upload status checking
+        self.filespanx = None
