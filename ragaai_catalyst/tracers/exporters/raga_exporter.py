@@ -21,7 +21,6 @@ class RagaExporter:
         "prompt": "prompt",
         "response": "response",
         "context": "context",
-        "prompt_length": "promptLength",
         "llm_model": "pipeline",
         "recorded_on": "metadata",
         "embed_model": "pipeline",
