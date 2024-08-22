@@ -253,41 +253,16 @@ class RagaExporter:
 
 
     async def check_and_upload_files(self, session, file_paths):
-        """
-        Checks if there are files to upload, gets presigned URLs, uploads files, and streams them if successful.
-
-        Args:
-            self: The object instance.
-            session (aiohttp.ClientSession): The aiohttp session to use for the request.
-            file_paths (list): List of file paths to upload.
-
-        Returns:
-            str: The status of the upload process.
-        """ """
-        Asynchronously uploads a file using the given session, url, and file path.
-
-        Args:
-            self: The RagaExporter instance.
-            session (aiohttp.ClientSession): The aiohttp session to use for the request.
-            url (str): The URL to upload the file to.
-            file_path (str): The path to the file to upload.
-
-        Returns:
-            int: The status code of the response.
-        """
-        # Check if there are no files to upload
-        if len(file_paths) == 0:
+        if not file_paths:
             logger.info("No files to be uploaded.")
-            return None
+            return "No files to upload"
 
-        # Ensure a required environment token is available; if not, attempt to obtain it.
         if os.getenv("RAGAAI_CATALYST_TOKEN") is None:
             await get_token()
             if os.getenv("RAGAAI_CATALYST_TOKEN") is None:
-                print("Failed to obtain token.")
+                logger.error("Failed to obtain token.")
                 return None
 
-        # Initialize lists for URLs and tasks
         presigned_urls = []
         trace_folder_urls = []
         num_files = len(file_paths)
@@ -309,10 +284,10 @@ class RagaExporter:
             return None
 
         # Upload and stream files
-        for file_path, presigned_url in tqdm(zip(file_paths, presigned_urls), total=num_files, desc="Uploading traces"):
+        async def process_file(file_path, presigned_url):
             if not os.path.isfile(file_path):
                 logger.warning(f"The file '{file_path}' does not exist.")
-                continue
+                return False
 
             try:
                 upload_status = await self.upload_file(session, presigned_url, file_path)
@@ -322,14 +297,27 @@ class RagaExporter:
                     if stream_status in (200, 201):
                         logger.debug(f"File '{os.path.basename(file_path)}' streamed successfully.")
                         self._backup_file(file_path)
+                        return True
                     else:
                         logger.error(f"Failed to stream the file '{os.path.basename(file_path)}'.")
                 else:
                     logger.error(f"Failed to upload the file '{os.path.basename(file_path)}'.")
             except Exception as e:
                 logger.error(f"Error processing file '{os.path.basename(file_path)}': {str(e)}")
+            return False
 
-        return "Upload completed"
+        tasks = [process_file(file_path, presigned_url) for file_path, presigned_url in zip(file_paths, presigned_urls)]
+        results = await asyncio.gather(*tasks)
+
+        successful_uploads = sum(results)
+        total_files = len(file_paths)
+
+        if successful_uploads == total_files:
+            return f"All {total_files} files uploaded and processed successfully"
+        elif successful_uploads > 0:
+            return f"{successful_uploads} out of {total_files} files uploaded and processed successfully"
+        else:
+            return "Failed to upload and process any files"
 
     def _backup_file(self, file_path):
         backup_dir = os.path.join(os.path.dirname(file_path), "backup")
@@ -338,34 +326,63 @@ class RagaExporter:
         shutil.move(file_path, backup_file)
 
     async def upload_file(self, session, url, file_path):
+        if not file_path or not os.path.isfile(file_path):
+            logger.error(f"Invalid file path: {file_path}")
+            return 400
+
         headers = {"Content-Type": "application/json"}
         if "blob.core.windows.net" in url:
             headers["x-ms-blob-type"] = "BlockBlob"
 
         logger.debug(f"Uploading file: {file_path} with URL: {url}")
 
-        async with aiohttp.ClientTimeout(total=self.TIMEOUT):
+        try:
             with open(file_path, 'rb') as f:
                 data = f.read()
-            async with session.put(url, headers=headers, data=data) as response:
+            async with session.put(url, headers=headers, data=data, timeout=self.TIMEOUT) as response:
                 status = response.status
                 if status not in (200, 201):
                     logger.error(f"Upload failed with status {status}")
                 return status
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout while uploading file: {file_path}")
+            return 408  # Request Timeout
+        except Exception as e:
+            logger.error(f"Error uploading file {file_path}: {str(e)}")
+            return 500  # Internal Server Error
 
+
+    async def stream_trace(self, session, trace_uri):
+        headers = {
+            "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+            "Content-Type": "application/json",
+            "X-Project-Name": self.project_name,
+        }
+
+        json_data = {
+            "projectName": self.project_name,
+            "traceUri": trace_uri,
+        }
+
+        try:
+            async with session.post(
+                f"{RagaExporter.BASE_URL}/v1/llm/insert/trace",
+                headers=headers,
+                json=json_data,
+                timeout=self.TIMEOUT
+            ) as response:
+                status = response.status
+                if status not in (200, 201):
+                    logger.error(f"Stream trace failed with status {status}")
+                return status
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout while streaming trace: {trace_uri}")
+            return 408  # Request Timeout
+        except Exception as e:
+            logger.error(f"Error streaming trace {trace_uri}: {str(e)}")
+            return 500  # Internal Server Error
 
     async def tracer_stopsession(self, file_names):
-        """
-        Asynchronously stops the tracing session, checks for RAGAAI_CATALYST_TOKEN, and uploads files if the token is present.
-
-        Parameters:
-            self: The current instance of the class.
-            file_names: A list of file names to be uploaded.
-
-        Returns:
-            None
-        """
-
         async with aiohttp.ClientSession() as session:
             if os.getenv("RAGAAI_CATALYST_TOKEN"):
                 logger.info("Token obtained successfully.")
