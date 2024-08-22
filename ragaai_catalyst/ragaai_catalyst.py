@@ -11,7 +11,7 @@ class RagaAICatalyst:
     TIMEOUT = 10  # Default timeout in seconds
 
     def __init__(
-        self, access_key, secret_key, api_keys: Optional[Dict[str, str]] = None
+        self, access_key, secret_key, api_keys: Optional[Dict[str, str]] = None, base_url: str=None
     ):
         """
         Initializes a new instance of the RagaAICatalyst class.
@@ -27,6 +27,18 @@ class RagaAICatalyst:
         Returns:
             None
         """
+        if base_url:
+            RagaAICatalyst.BASE_URL = base_url
+            os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
+
+        if not access_key or not secret_key:
+            logger.error(
+                "RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables must be set"
+            )
+            raise ValueError(
+                "RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables must be set"
+            )
+
         self.access_key, self.secret_key = self._set_access_key_secret_key(
             access_key, secret_key
         )
@@ -38,13 +50,6 @@ class RagaAICatalyst:
         os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
         os.environ["RAGAAI_CATALYST_SECRET_KEY"] = secret_key
 
-        if not self.access_key or not self.secret_key:
-            logger.error(
-                "RAGAAI_CATALYST_ACCESS_KEY and RAGA TRACER_SECRET_KEY environment variables must be set"
-            )
-            raise ValueError(
-                "RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables must be set"
-            )
         self.api_keys = api_keys or {}
         self.get_token()
         if self.api_keys:
