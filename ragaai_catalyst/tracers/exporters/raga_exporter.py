@@ -293,7 +293,7 @@ class RagaExporter:
             await get_token()  # Fetch a new token and set it in the environment
             response, status = await make_request()  # Retry the request
 
-        if response.status != 200 and response.status != 201:
+        if response.status != 200 or response.status != 201:
             raise aiohttp.ClientResponseError(
                 response.request_info,
                 response.history,
