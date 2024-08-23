@@ -21,7 +21,6 @@ class RagaExporter:
         "prompt": "prompt",
         "response": "response",
         "context": "context",
-        "prompt_length": "promptLength",
         "llm_model": "pipeline",
         "recorded_on": "metadata",
         "embed_model": "pipeline",
@@ -85,6 +84,7 @@ class RagaExporter:
         def make_request():
             headers = {
                 "authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name,
             }
             response = requests.get(
                 f"{RagaExporter.BASE_URL}/v1/llm/master-dataset/schema/{self.project_name}",
@@ -125,6 +125,7 @@ class RagaExporter:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name,
             }
             json_data = {
                 "projectName": self.project_name,
@@ -176,6 +177,7 @@ class RagaExporter:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name,
             }
             async with session.get(
                 f"{RagaExporter.BASE_URL}/v1/llm/presigned-url",
@@ -220,6 +222,7 @@ class RagaExporter:
             headers = {
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
                 "Content-Type": "application/json",
+                "X-Project-Name": self.project_name,
             }
 
             json_data = {
@@ -251,6 +254,7 @@ class RagaExporter:
     async def upload_file(self, session, url, file_path):
         """
         Asynchronously uploads a file using the given session, url, and file path.
+        Supports both regular and Azure blob storage URLs.
 
         Args:
             self: The RagaExporter instance.
@@ -263,30 +267,39 @@ class RagaExporter:
         """
 
         async def make_request():
-
             headers = {
                 "Content-Type": "application/json",
             }
+
+            if "blob.core.windows.net" in url:  # Azure
+                headers["x-ms-blob-type"] = "BlockBlob"
+
             print(f"Uploading traces...")
             logger.debug(f"Uploading file:{file_path} with url {url}")
-            with open(file_path) as f:
-                data = f.read().replace("\n", "").replace("\r", "").encode()
-            async with session.put(
-                url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
-            ) as response:
 
-                # print(json_response)
+            with open(file_path, 'rb') as f:
+                data = f.read()
+
+            async with session.put(
+                    url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
+            ) as response:
                 status = response.status
                 return response, status
 
         response, status = await make_request()
         await self.response_checker_async(response, "RagaExporter.upload_file")
+
         if response.status == 401:
             await get_token()  # Fetch a new token and set it in the environment
             response, status = await make_request()  # Retry the request
 
-        if response.status != 200:
-            return response.status
+        if response.status != 200 or response.status != 201:
+            raise aiohttp.ClientResponseError(
+                response.request_info,
+                response.history,
+                status=response.status,
+                message=f"Upload failed with status {response.status}"
+            )
 
         return response.status
 
@@ -366,14 +379,14 @@ class RagaExporter:
                 upload_status = await self.upload_file(
                     session, presigned_url, file_path
                 )
-                if upload_status == 200:
+                if upload_status == 200 or upload_status == 201:
                     logger.debug(
                         f"File '{os.path.basename(file_path)}' uploaded successfully."
                     )
                     stream_status = await self.stream_trace(
                         session, trace_uri=presigned_url
                     )
-                    if stream_status == 200:
+                    if stream_status == 200 or stream_status == 201:
                         logger.debug(
                             f"File '{os.path.basename(file_path)}' streamed successfully."
                         )

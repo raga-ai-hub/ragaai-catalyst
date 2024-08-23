@@ -66,6 +66,7 @@ class Experiment:
         def make_request():
             headers = {
                 "authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Name": self.project_name
             }
             params = {
                 "name": self.project_name,
@@ -106,6 +107,7 @@ class Experiment:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+            "X-Project-Name": self.project_name,
         }
 
         if not isinstance(metrics, list):
@@ -147,6 +149,7 @@ class Experiment:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                "X-Project-Name": self.project_name,
             }
             response = requests.post(
                 f"{Experiment.BASE_URL}/v1/llm/experiment",
@@ -185,6 +188,7 @@ class Experiment:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+            "X-Project-Name": self.project_name,
         }
         if self.job_id is None:
             logger.warning("Attempt to fetch status without a valid job ID.")
@@ -211,6 +215,7 @@ class Experiment:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                "X-Project-Name": self.project_name,
             }
             response = requests.post(
                 f"{Experiment.BASE_URL}/job/status",
@@ -242,14 +247,16 @@ class Experiment:
         If the status code is 401, it retries the request and returns the test response if successful.
         If the status is neither 200 nor 401, it logs an error and returns the response checker result.
         """
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-        }
 
         if self.job_id is None:
             logger.warning("Results fetch attempted without prior job execution.")
             return "Please run an experiment test first"
+
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+            "X-Project-Id": self.project_id
+        }
 
         json_data = {
             "fields": [],
@@ -282,6 +289,7 @@ class Experiment:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                "X-Project-Id": self.project_id
             }
             response = requests.post(
                 f"{Experiment.BASE_URL}/v1/llm/docs",
