@@ -101,16 +101,16 @@ experiment_manager = Experiment(
 # Add metrics to the experiment
 experiment_manager.add_metrics(
     metrics=[
-      {"name": "hallucination", "config": {"model": "gpt-4o"}}
+      {"name": "hallucination", "config": {"model": "gpt-4o", "provider":"OpenAI"}}
     ]
 )
 
 # Add multiple metrics
 experiment_manager.add_metrics(
     metrics=[
-        {"name": "hallucination", "config": {"model": "gpt-4o"}},
-        {"name": "hallucination", "config": {"model": "gpt-4"}},
-        {"name": "hallucination", "config": {"model": "gpt-3.5-turbo"}},
+        {"name": "hallucination", "config": {"model": "gpt-4o", "provider":"OpenAI"}},
+        {"name": "hallucination", "config": {"model": "gpt-4", "provider":"OpenAI"}},
+        {"name": "hallucination", "config": {"model": "gpt-3.5-turbo", "provider":"OpenAI"}}
     ]
 )
 
