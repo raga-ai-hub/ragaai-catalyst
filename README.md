@@ -100,10 +100,9 @@ experiment_manager = Experiment(
 
 # Add metrics to the experiment
 experiment_manager.add_metrics(
-    metrics={
-        "name": "hallucination",
-        "config": {"model": "gpt-4o"},
-    }
+    metrics=[
+      {"name": "hallucination", "config": {"model": "gpt-4o"}}
+    ]
 )
 
 # Add multiple metrics
