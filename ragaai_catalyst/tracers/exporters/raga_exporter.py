@@ -277,8 +277,8 @@ class RagaExporter:
             print(f"Uploading traces...")
             logger.debug(f"Uploading file:{file_path} with url {url}")
 
-            with open(file_path, 'rb') as f:
-                data = f.read()
+            with open(file_path) as f:
+                data = f.read().replace("\n", "").replace("\r", "").encode()
 
             async with session.put(
                     url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
@@ -294,12 +294,8 @@ class RagaExporter:
             response, status = await make_request()  # Retry the request
 
         if response.status != 200 or response.status != 201:
-            raise aiohttp.ClientResponseError(
-                response.request_info,
-                response.history,
-                status=response.status,
-                message=f"Upload failed with status {response.status}"
-            )
+            return response.status
+
 
         return response.status
 

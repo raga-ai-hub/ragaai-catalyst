@@ -11,7 +11,11 @@ class RagaAICatalyst:
     TIMEOUT = 10  # Default timeout in seconds
 
     def __init__(
-        self, access_key, secret_key, api_keys: Optional[Dict[str, str]] = None, base_url: str=None
+        self,
+        access_key,
+        secret_key,
+        api_keys: Optional[Dict[str, str]] = None,
+        base_url: Optional[str] = None,
     ):
         """
         Initializes a new instance of the RagaAICatalyst class.
@@ -54,6 +58,10 @@ class RagaAICatalyst:
         self.get_token()
         if self.api_keys:
             self._upload_keys()
+
+        if base_url:
+            RagaAICatalyst.BASE_URL = base_url
+            os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
 
     def _set_access_key_secret_key(self, access_key, secret_key):
         os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
