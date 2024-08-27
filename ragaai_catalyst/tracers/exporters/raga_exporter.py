@@ -254,6 +254,7 @@ class RagaExporter:
     async def upload_file(self, session, url, file_path):
         """
         Asynchronously uploads a file using the given session, url, and file path.
+        Supports both regular and Azure blob storage URLs.
 
         Args:
             self: The RagaExporter instance.
@@ -266,10 +267,10 @@ class RagaExporter:
         """
 
         async def make_request():
-
             headers = {
                 "Content-Type": "application/json",
             }
+
             if "blob.core.windows.net" in url:  # Azure
                 headers["x-ms-blob-type"] = "BlockBlob"
 
@@ -278,22 +279,23 @@ class RagaExporter:
 
             with open(file_path) as f:
                 data = f.read().replace("\n", "").replace("\r", "").encode()
-            async with session.put(
-                url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
-            ) as response:
 
-                # print(json_response)
+            async with session.put(
+                    url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
+            ) as response:
                 status = response.status
                 return response, status
 
         response, status = await make_request()
         await self.response_checker_async(response, "RagaExporter.upload_file")
+
         if response.status == 401:
             await get_token()  # Fetch a new token and set it in the environment
             response, status = await make_request()  # Retry the request
 
         if response.status != 200 or response.status != 201:
             return response.status
+
 
         return response.status
 

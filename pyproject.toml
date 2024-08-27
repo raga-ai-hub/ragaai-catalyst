@@ -16,7 +16,7 @@ authors = [
 ]
 
 dependencies = [
-    "aiohttp~=3.9.5",
+    "aiohttp>=3.10.2", # Ref: https://github.com/raga-ai-hub/ragaai-catalyst/security/dependabot/1
     "opentelemetry-api~=1.25.0",
     "opentelemetry-sdk~=1.25.0",
     "opentelemetry-instrumentation~=0.46b0",
