@@ -18,7 +18,7 @@ class Dataset:
         Dataset.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://llm-platform.dev4.ragaai.ai/api"
+            else "https://llm-platform.prod5.ragaai.ai/api"
         )
 
     def list_datasets(self):
@@ -36,7 +36,7 @@ class Dataset:
             headers = {
                 "accept": "application/json, text/plain, */*",
                 "authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-                "X-Project-Name": self.project_name
+                "X-Project-Name": self.project_name,
             }
             params = {
                 "projectName": self.project_name,
