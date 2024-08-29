@@ -32,7 +32,7 @@ class Experiment:
         Experiment.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://llm-platform.dev4.ragaai.ai/api"
+            else "https://llm-platform.prod5.ragaai.ai/api"
         )
         self.project_name = project_name
         self.experiment_name = experiment_name
@@ -66,7 +66,7 @@ class Experiment:
         def make_request():
             headers = {
                 "authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-                "X-Project-Name": self.project_name
+                "X-Project-Name": self.project_name,
             }
             params = {
                 "name": self.project_name,
@@ -255,7 +255,7 @@ class Experiment:
         headers = {
             "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-            "X-Project-Id": self.project_id
+            "X-Project-Id": str(self.project_id),
         }
 
         json_data = {
@@ -289,7 +289,7 @@ class Experiment:
             headers = {
                 "Content-Type": "application/json",
                 "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-                "X-Project-Id": self.project_id
+                "X-Project-Id": str(self.project_id),
             }
             response = requests.post(
                 f"{Experiment.BASE_URL}/v1/llm/docs",
