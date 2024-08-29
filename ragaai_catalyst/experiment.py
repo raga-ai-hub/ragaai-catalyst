@@ -1,6 +1,7 @@
 import os
 import requests
 import logging
+import pandas as pd
 from .utils import response_checker
 from .ragaai_catalyst import RagaAICatalyst
 
@@ -191,15 +192,17 @@ class Experiment:
             "X-Project-Name": self.project_name,
         }
         if job_id is not None:
-            self.job_id = job_id
+            job_id_to_check = job_id
+        else:
+            job_id_to_check = self.job_id
 
-        if self.job_id is None:
+        if job_id_to_check is None:
             logger.warning("Attempt to fetch status without a valid job ID.")
             return "Please run an experiment test first"
         json_data = {
-            "jobId": self.job_id,
+            "jobId": job_id_to_check,
         }
-        logger.debug(f"Fetching status for Job ID: {self.job_id}")
+        logger.debug(f"Fetching status for Job ID: {job_id_to_check}")
         response = requests.get(
             f"{Experiment.BASE_URL}/job/status",
             headers=headers,
@@ -208,11 +211,10 @@ class Experiment:
         )
         status_code = response_checker(response, "Experiment.get_status")
         if status_code == 200:
-            # print(f"Status retrieved: Job ID {self.job_id} is active.")
             test_response = response.json()
             jobs = test_response["data"]["content"]
             for job in jobs:
-                if job["id"] == self.job_id:
+                if job["id"] == job_id_to_check:
                     return job["status"]
         elif status_code == 401:
             headers = {
@@ -251,9 +253,11 @@ class Experiment:
         If the status is neither 200 nor 401, it logs an error and returns the response checker result.
         """
         if job_id is not None:
-            self.job_id = job_id
+            job_id_to_use = job_id
+        else:
+            job_id_to_use = self.job_id
 
-        if self.job_id is None:
+        if job_id_to_use is None:
             logger.warning("Results fetch attempted without prior job execution.")
             return "Please run an experiment test first"
 
@@ -271,7 +275,7 @@ class Experiment:
             "filterList": [],
         }
 
-        status_json = self.get_status()
+        status_json = self.get_status(job_id_to_use)
         if status_json == "Failed":
             return print("Job failed. No results to fetch.")
         elif status_json == "In Progress":
@@ -285,11 +289,27 @@ class Experiment:
             json=json_data,
             timeout=Experiment.TIMEOUT,
         )
-        # status_code = response_checker(response, "Experiment.get_test_results")
         if response.status_code == 200:
-            print(f"Results successfully retrieved.")
+            print("Results successfully retrieved.")
             test_response = response.json()
-            return test_response
+
+            if test_response["success"]:
+                parse_success, parsed_response = self.parse_response(test_response)
+                if parse_success:
+                    return parsed_response
+                else:
+                    logger.error(f"Failed to parse response: {test_response}")
+                    raise FailedToRetrieveResults(
+                        f"Failed to parse response: {test_response}"
+                    )
+
+            else:
+                logger.error(f"Failed to retrieve results for job: {job_id_to_use}")
+                raise FailedToRetrieveResults(
+                    f"Failed to retrieve results for job: {job_id_to_use}"
+                )
+
+            return parsed_response
         elif response.status_code == 401:
             headers = {
                 "Content-Type": "application/json",
@@ -302,7 +322,6 @@ class Experiment:
                 json=json_data,
                 timeout=Experiment.TIMEOUT,
             )
-            # status_code = response_checker(response, "Experiment.get_test_results")
             if response.status_code == 200:
                 test_response = response.json()
                 return test_response
@@ -310,8 +329,22 @@ class Experiment:
                 logger.error("Endpoint not responsive after retry attempts.")
                 return response_checker(response, "Experiment.get_test_results")
         else:
-
             return (
                 "Error in running tests",
                 response_checker(response, "Experiment.get_test_results"),
             )
+
+    def parse_response(self, response):
+        """
+        Parse the response to get the results
+        """
+        try:
+            parsed_response_df = pd.DataFrame(response["data"]["docs"])
+            return True, parsed_response_df
+        except Exception as e:
+            logger.error(f"Failed to parse response: {e}")
+            return False, ""
+
+
+class FailedToRetrieveResults(Exception):
+    pass
