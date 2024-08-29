@@ -179,7 +179,7 @@ class Experiment:
                 response_checker(response, "Experiment.run_tests"),
             )
 
-    def get_status(self):
+    def get_status(self, job_id=None):
         """
         Retrieves the status of a job based on the provided job ID.
 
@@ -190,6 +190,9 @@ class Experiment:
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
             "X-Project-Name": self.project_name,
         }
+        if job_id is not None:
+            self.job_id = job_id
+
         if self.job_id is None:
             logger.warning("Attempt to fetch status without a valid job ID.")
             return "Please run an experiment test first"
@@ -239,7 +242,7 @@ class Experiment:
                 response_checker(response, "Experiment.get_status"),
             )
 
-    def get_results(self):
+    def get_results(self, job_id=None):
         """
         A function that retrieves results based on the experiment ID.
         It makes a POST request to the BASE_URL to fetch results using the provided JSON data.
@@ -247,6 +250,8 @@ class Experiment:
         If the status code is 401, it retries the request and returns the test response if successful.
         If the status is neither 200 nor 401, it logs an error and returns the response checker result.
         """
+        if job_id is not None:
+            self.job_id = job_id
 
         if self.job_id is None:
             logger.warning("Results fetch attempted without prior job execution.")
