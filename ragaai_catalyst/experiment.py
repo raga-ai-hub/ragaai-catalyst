@@ -339,11 +339,51 @@ class Experiment:
         Parse the response to get the results
         """
         try:
-            parsed_response_df = pd.DataFrame(response["data"]["docs"])
-            return True, parsed_response_df
+            x = pd.DataFrame(response["data"]["docs"])
+
+            column_names_to_replace = [
+                {item["columnName"]: item["displayName"]}
+                for item in response["data"]["columns"]
+            ]
+
+            if column_names_to_replace:
+                for item in column_names_to_replace:
+                    x = x.rename(columns=item)
+
+                dict_cols = [
+                    col
+                    for col in x.columns
+                    if x[col].dtype == "object"
+                    and x[col].apply(lambda y: isinstance(y, dict)).any()
+                ]
+
+                for dict_col in dict_cols:
+                    x[f"{dict_col}_reason"] = x[dict_col].apply(
+                        lambda y: y.get("reason") if isinstance(y, dict) else None
+                    )
+                    x[f"{dict_col}_metric_config"] = x[dict_col].apply(
+                        lambda y: (
+                            y.get("metric_config") if isinstance(y, dict) else None
+                        )
+                    )
+                    x[f"{dict_col}_passed"] = x[dict_col].apply(
+                        lambda y: y.get("passed") if isinstance(y, dict) else None
+                    )
+                    x[f"{dict_col}_status"] = x[dict_col].apply(
+                        lambda y: y.get("status") if isinstance(y, dict) else None
+                    )
+
+                    x = x.drop(columns=[dict_col])
+
+            x.columns = x.columns.str.replace("_reason_reason", "_reason")
+            x.columns = x.columns.str.replace("_reason_metric_config", "_metric_config")
+            x.columns = x.columns.str.replace("_reason_passed", "_passed")
+            x.columns = x.columns.str.replace("_reason_status", "_status")
+            return True, x
+
         except Exception as e:
-            logger.error(f"Failed to parse response: {e}")
-            return False, ""
+            logger.error(f"Failed to parse response: {e}", exc_info=True)
+            return False, pd.DataFrame()
 
 
 class FailedToRetrieveResults(Exception):
