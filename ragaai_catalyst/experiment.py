@@ -366,9 +366,6 @@ class Experiment:
                             y.get("metric_config") if isinstance(y, dict) else None
                         )
                     )
-                    x[f"{dict_col}_passed"] = x[dict_col].apply(
-                        lambda y: y.get("passed") if isinstance(y, dict) else None
-                    )
                     x[f"{dict_col}_status"] = x[dict_col].apply(
                         lambda y: y.get("status") if isinstance(y, dict) else None
                     )
@@ -377,8 +374,10 @@ class Experiment:
 
             x.columns = x.columns.str.replace("_reason_reason", "_reason")
             x.columns = x.columns.str.replace("_reason_metric_config", "_metric_config")
-            x.columns = x.columns.str.replace("_reason_passed", "_passed")
             x.columns = x.columns.str.replace("_reason_status", "_status")
+
+            x = x.drop(columns=["trace_uri"])
+
             return True, x
 
         except Exception as e:
