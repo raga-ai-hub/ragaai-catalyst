@@ -116,6 +116,11 @@ class Experiment:
         else:
             metrics_list = metrics
 
+        sub_metrics = RagaAICatalyst.list_metrics()  
+        for metric in metrics_list:
+            if metric['name'] not in sub_metrics:
+                raise ValueError("Enter a valid metric name. Refer to RagaAI Metric Library to select a valid metric")
+
         json_data = {
             "projectName": self.project_name,
             "datasetName": self.dataset_name,
