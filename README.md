@@ -71,12 +71,12 @@ tracer = Tracer(
         "vector_store": "faiss",
         "embed_model": "text-embedding-ada-002",
     }
-).start_trace()
+).start()
 
 # Your code here
 
 # Stop the trace recording
-tracer.stop_trace()
+tracer.stop()
 
 # Alternatively, use a context manager
 with tracer.trace():
