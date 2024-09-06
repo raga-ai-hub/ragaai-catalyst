@@ -44,7 +44,7 @@ class RagaExporter:
         RagaExporter.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://llm-platform.dev4.ragaai.ai/api"
+            else "https://catalyst.raga.ai/api"
         )
         self.access_key = os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
         self.secret_key = os.getenv("RAGAAI_CATALYST_SECRET_KEY")
