@@ -42,6 +42,28 @@ class Experiment:
         self.experiment_id = None
         self.job_id = None
 
+        params = {
+            "size": str(100),
+            "page": "0",
+            "type": "llm",
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+        }
+        response = requests.get(
+            f"{RagaAICatalyst.BASE_URL}/projects",
+            params=params,
+            headers=headers,
+            timeout=10,
+        )
+        response.raise_for_status()
+        # logger.debug("Projects list retrieved successfully")
+        experiment_list = [exp["name"] for project in response.json()["data"]["content"] if project["name"] == self.project_name for exp in project["experiments"]]
+
+        if self.experiment_name in experiment_list:
+            raise ValueError("The experiment name already exists in the project. Enter a unique experiment name.")
+
         self.access_key = os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
         self.secret_key = os.getenv("RAGAAI_CATALYST_SECRET_KEY")
 
