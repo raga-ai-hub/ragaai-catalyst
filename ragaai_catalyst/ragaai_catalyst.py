@@ -130,7 +130,7 @@ class RagaAICatalyst:
         Raises:
             - requests.exceptions.HTTPError: If there is an HTTP error while retrieving the token.
             - requests.exceptions.RequestException: If there is an error while retrieving the token.
-            - ValueError: If there is a JSON decoding error.
+            - ValueError: If there is a JSON decoding error or if authentication fails.
             - Exception: If there is an unexpected error while retrieving the token.
         """
         access_key = os.getenv("RAGAAI_CATALYST_ACCESS_KEY")
@@ -155,6 +155,13 @@ class RagaAICatalyst:
                 json=json_data,
                 timeout=RagaAICatalyst.TIMEOUT,
             )
+
+            # Handle specific status codes before raising an error
+            if response.status_code == 400:
+                token_response = response.json()
+                if token_response.get("message") == "Please enter valid credentials":
+                    raise ValueError("Authentication failed. Navigate to Settings/Authentication to generate new Secret key and Access key")
+
             response.raise_for_status()
 
             token_response = response.json()
@@ -187,8 +194,8 @@ class RagaAICatalyst:
             logger.error("Error occurred while retrieving token: %s", str(req_err))
             return None
         except ValueError as json_err:
-            logger.error("JSON decoding error: %s", str(json_err))
-            return None
+            logger.error("JSON decoding error or authentication failed: %s", str(json_err))
+            raise
         except Exception as e:
             logger.error("Unexpected error occurred while retrieving token: %s", str(e))
             return None
