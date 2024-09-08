@@ -18,6 +18,8 @@ from .instrumentators import (
 )
 from .utils import get_unique_key
 
+from ..ragaai_catalyst import RagaAICatalyst
+
 logger = logging.getLogger(__name__)
 
 
@@ -52,6 +54,31 @@ class Tracer:
         self.pipeline = pipeline
         self.description = description
         self.upload_timeout = upload_timeout
+
+        params = {
+            "size": str(100),
+            "page": "0",
+            "type": "llm",
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+        }
+        response = requests.get(
+            f"{RagaAICatalyst.BASE_URL}/projects",
+            params=params,
+            headers=headers,
+            timeout=10,
+        )
+        response.raise_for_status()
+        # logger.debug("Projects list retrieved successfully")
+        project_list = [
+            project["name"] for project in response.json()["data"]["content"]
+        ]
+
+        if self.project_name not in project_list:
+            raise ValueError("Project not found. Please enter a valid project name")
+
 
         self.raga_client = RagaExporter(project_name=self.project_name)
 
