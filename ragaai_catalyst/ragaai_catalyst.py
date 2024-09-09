@@ -46,20 +46,6 @@ class RagaAICatalyst:
             access_key, secret_key
         )
 
-        if base_url:
-            try:
-                response = requests.post(
-                    f"{base_url}/token",
-                    headers={"Content-Type": "application/json"},
-                    json={"accessKey": access_key, "secretKey": secret_key},
-                    timeout=RagaAICatalyst.TIMEOUT,
-                )
-                response.raise_for_status()
-                RagaAICatalyst.BASE_URL = base_url
-                os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
-            except requests.exceptions.RequestException:
-                raise ConnectionError("The provided base_url is not accessible. Please re-check the base_url.")
-
         RagaAICatalyst.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
@@ -74,8 +60,18 @@ class RagaAICatalyst:
             self._upload_keys()
 
         if base_url:
-            RagaAICatalyst.BASE_URL = base_url
-            os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
+            try:
+                response = requests.post(
+                    f"{base_url}/token",
+                    headers={"Content-Type": "application/json"},
+                    json={"accessKey": access_key, "secretKey": secret_key},
+                    timeout=RagaAICatalyst.TIMEOUT,
+                )
+                response.raise_for_status()
+                RagaAICatalyst.BASE_URL = base_url
+                os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
+            except requests.exceptions.RequestException:
+                raise ConnectionError("The provided base_url is not accessible. Please re-check the base_url.")
 
     def _set_access_key_secret_key(self, access_key, secret_key):
         os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
