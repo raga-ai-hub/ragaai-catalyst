@@ -24,16 +24,15 @@ class RagaAICatalyst:
             access_key (str): The access key for the RagaAICatalyst.
             secret_key (str): The secret key for the RagaAICatalyst.
             api_keys (Optional[Dict[str, str]]): A dictionary of API keys for different services. Defaults to None.
+            base_url (Optional[str]): The base URL for the RagaAICatalyst API. Defaults to None.
 
         Raises:
             ValueError: If the RAGAAI_CATALYST_ACCESS_KEY and RAGAAI_CATALYST_SECRET_KEY environment variables are not set.
+            ConnectionError: If the provided base_url is not accessible.
 
         Returns:
             None
         """
-        if base_url:
-            RagaAICatalyst.BASE_URL = base_url
-            os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
 
         if not access_key or not secret_key:
             logger.error(
@@ -46,6 +45,21 @@ class RagaAICatalyst:
         self.access_key, self.secret_key = self._set_access_key_secret_key(
             access_key, secret_key
         )
+
+        if base_url:
+            try:
+                response = requests.post(
+                    f"{base_url}/token",
+                    headers={"Content-Type": "application/json"},
+                    json={"accessKey": access_key, "secretKey": secret_key},
+                    timeout=RagaAICatalyst.TIMEOUT,
+                )
+                response.raise_for_status()
+                RagaAICatalyst.BASE_URL = base_url
+                os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
+            except requests.exceptions.RequestException:
+                raise ConnectionError("The provided base_url is not accessible. Please re-check the base_url.")
+
         RagaAICatalyst.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
