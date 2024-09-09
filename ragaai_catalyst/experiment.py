@@ -50,8 +50,44 @@ class Experiment:
             if os.getenv("RAGAAI_CATALYST_TOKEN") is not None
             else get_token()
         )
+        
+        if not self._check_if_project_exists(project_name=project_name):
+            raise ValueError(f"Project '{project_name}' not found. Please enter a valid project name")
+
         self.metrics = []
 
+    def _check_if_project_exists(self,project_name,num_projects=100):
+        # TODO: 1. List All projects
+        params = {
+            "size": str(num_projects),
+            "page": "0",
+            "type": "llm",
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+        }
+        response = requests.get(
+            f"{RagaAICatalyst.BASE_URL}/projects",
+            params=params,
+            headers=headers,
+            timeout=self.TIMEOUT,
+        )
+        response.raise_for_status()
+        logger.debug("Projects list retrieved successfully")
+        project_list = [
+            project["name"] for project in response.json()["data"]["content"]
+        ]
+        
+        # TODO: 2. Check if the given project_name exists
+        # TODO: 3. Return bool (True / False output)
+        exists = project_name in project_list
+        if exists:
+            logger.info(f"Project '{project_name}' exists.")
+        else:
+            logger.info(f"Project '{project_name}' does not exist.")
+        return exists
+        
     def list_experiments(self):
         """
         Retrieves a list of experiments associated with the current project.

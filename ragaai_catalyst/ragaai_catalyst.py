@@ -262,6 +262,7 @@ class RagaAICatalyst:
                 "Unexpected error while creating project: %s", str(general_err1)
             )
             return "An unexpected error occurred while creating the project"
+        
 
     def list_projects(self, num_projects=100):
         """
