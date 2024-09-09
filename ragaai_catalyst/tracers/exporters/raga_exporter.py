@@ -92,12 +92,37 @@ class RagaExporter:
                 timeout=RagaExporter.TIMEOUT,
             )
             return response
+    
+
+        def compare_schemas(base_schema, project_schema):
+            differences = []
+            for key, base_value in base_schema.items():
+                if key not in project_schema:
+                    differences.append(f"Key '{key}' is missing in new schema.")
+                else:
+                    # Remove everything after '_' in the new schema value
+                    new_value = project_schema[key].split('_')[0]
+                    if base_value != new_value:
+                        differences.append(f"Value mismatch for key '{key}': base = '{base_value}', new = '{new_value}'.")
+
+            if differences:
+                return False, differences
+            return True, []
+
 
         response = make_request()
         if response.status_code == 401:
             get_token()  # Fetch a new token and set it in the environment
             response = make_request()  # Retry the request
         if response.status_code != 200:
+            return response.status_code
+        if response.status_code == 200:
+            project_schema = response.json()["data"]
+            print(project_schema)
+            base_schema = RagaExporter.SCHEMA_MAPPING
+            is_same, _ = compare_schemas(base_schema, project_schema)
+            if not is_same:
+                raise Exception(f"Trace cannot be logged to this Project because of schema difference. Create a new project to log trace")
             return response.status_code
         return response.status_code
 
