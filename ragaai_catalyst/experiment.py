@@ -318,14 +318,15 @@ class Experiment:
             "projectId": self.project_id,
             "filterList": [],
         }
+        base_url_without_api = Experiment.BASE_URL.removesuffix('/api')
 
         status_json = self.get_status(job_id_to_use)
         if status_json == "Failed":
             return print("Job failed. No results to fetch.")
         elif status_json == "In Progress":
-            return print("Job in progress. Please wait while the job completes.")
+            return print(f"Job in progress. Please wait while the job completes.\n Visit Job Status: {base_url_without_api}/home/job-status to track")
         elif status_json == "Completed":
-            print("Job completed. fetching results")
+            print(f"Job completed. fetching results.\n Visit Job Status: {base_url_without_api}/home/job-status to track")
 
         response = requests.post(
             f"{Experiment.BASE_URL}/v1/llm/docs",
