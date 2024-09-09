@@ -154,8 +154,9 @@ class Experiment:
         sub_providers = ["openai","azure","gemini","groq"]
         sub_metrics = RagaAICatalyst.list_metrics()  
         for metric in metrics_list:
-            if metric["config"]["provider"].lower() not in sub_providers:
-                raise ValueError("Enter a valid provider name. The following Provider names are supported:OpenAI,Azure,Gemini,Groq")
+            provider = metric.get('config', {}).get('provider', '').lower()
+            if provider and provider not in sub_providers:
+                raise ValueError("Enter a valid provider name. The following Provider names are supported: OpenAI, Azure, Gemini, Groq")
 
             if metric['name'] not in sub_metrics:
                 raise ValueError("Enter a valid metric name. Refer to RagaAI Metric Library to select a valid metric")
