@@ -14,6 +14,7 @@ get_token = RagaAICatalyst.get_token
 class Experiment:
     BASE_URL = None
     TIMEOUT = 10
+    NUM_PROJECTS = 100
 
     def __init__(
         self, project_name, experiment_name, experiment_description, dataset_name
@@ -43,7 +44,7 @@ class Experiment:
         self.job_id = None
 
         params = {
-            "size": str(100),
+            "size": str(self.NUM_PROJECTS),
             "page": "0",
             "type": "llm",
         }

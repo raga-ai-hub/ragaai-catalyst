@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 class Tracer:
-
+    NUM_PROJECTS = 100
     def __init__(
         self,
         project_name,
@@ -56,7 +56,7 @@ class Tracer:
         self.upload_timeout = upload_timeout
 
         params = {
-            "size": str(100),
+            "size": str(self.NUM_PROJECTS),
             "page": "0",
             "type": "llm",
         }
