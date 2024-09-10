@@ -51,24 +51,16 @@ class RagaAICatalyst:
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
             else "https://catalyst.raga.ai/api"
         )
-        os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
-        os.environ["RAGAAI_CATALYST_SECRET_KEY"] = secret_key
 
         self.api_keys = api_keys or {}
-        self.get_token()
+
         if self.api_keys:
             self._upload_keys()
 
         if base_url:
+            RagaAICatalyst.BASE_URL = base_url
             try:
-                response = requests.post(
-                    f"{base_url}/token",
-                    headers={"Content-Type": "application/json"},
-                    json={"accessKey": access_key, "secretKey": secret_key},
-                    timeout=RagaAICatalyst.TIMEOUT,
-                )
-                response.raise_for_status()
-                RagaAICatalyst.BASE_URL = base_url
+                self.get_token()
                 os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
             except requests.exceptions.RequestException:
                 raise ConnectionError("The provided base_url is not accessible. Please re-check the base_url.")
@@ -158,57 +150,39 @@ class RagaAICatalyst:
             "secretKey": secret_key,
         }
 
-        try:
-            response = requests.post(
-                f"{ RagaAICatalyst.BASE_URL}/token",
-                headers=headers,
-                json=json_data,
-                timeout=RagaAICatalyst.TIMEOUT,
-            )
+        response = requests.post(
+            f"{ RagaAICatalyst.BASE_URL}/token",
+            headers=headers,
+            json=json_data,
+            timeout=RagaAICatalyst.TIMEOUT,
+        )
 
-            # Handle specific status codes before raising an error
-            if response.status_code == 400:
-                token_response = response.json()
-                if token_response.get("message") == "Please enter valid credentials":
-                    raise ValueError("Authentication failed. Navigate to Settings -> Authenticate to generate new Secret key and Access key")
-
-            response.raise_for_status()
-
+        # Handle specific status codes before raising an error
+        if response.status_code == 400:
             token_response = response.json()
+            if token_response.get("message") == "Please enter valid credentials":
+                raise Exception("Authentication failed. Navigate to Settings -> Authenticate to generate new Secret key and Access key")
 
-            if not token_response.get("success", False):
-                logger.error(
-                    "Token retrieval was not successful: %s",
-                    token_response.get("message", "Unknown error"),
-                )
-                return None
+        response.raise_for_status()
 
-            token = token_response.get("data", {}).get("token")
-            if token:
-                os.environ["RAGAAI_CATALYST_TOKEN"] = token
-                print("Token(s) set successfully")
-                return token
-            else:
-                logger.error("Token(s) not set")
-                return None
+        token_response = response.json()
 
-        except requests.exceptions.HTTPError as http_err:
+        if not token_response.get("success", False):
             logger.error(
-                "HTTP error occurred while retrieving token: %s", str(http_err)
+                "Token retrieval was not successful: %s",
+                token_response.get("message", "Unknown error"),
             )
-            if response.status_code == 500:
-                error_message = response.json().get("message", "Unknown server error")
-                logger.error("Server error: %s", error_message)
             return None
-        except requests.exceptions.RequestException as req_err:
-            logger.error("Error occurred while retrieving token: %s", str(req_err))
+
+        token = token_response.get("data", {}).get("token")
+        if token:
+            os.environ["RAGAAI_CATALYST_TOKEN"] = token
+            print("Token(s) set successfully")
+            return token
+        else:
+            logger.error("Token(s) not set")
             return None
-        except ValueError as json_err:
-            logger.error("JSON decoding error or authentication failed: %s", str(json_err))
-            raise
-        except Exception as e:
-            logger.error("Unexpected error occurred while retrieving token: %s", str(e))
-            return None
+
 
     def create_project(self, project_name, type="llm", description=""):
         """
