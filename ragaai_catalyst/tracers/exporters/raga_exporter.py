@@ -118,7 +118,6 @@ class RagaExporter:
             return response.status_code
         if response.status_code == 200:
             project_schema = response.json()["data"]
-            print(project_schema)
             base_schema = RagaExporter.SCHEMA_MAPPING
             is_same, _ = compare_schemas(base_schema, project_schema)
             if not is_same:
