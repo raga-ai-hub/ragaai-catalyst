@@ -53,8 +53,37 @@ class Experiment:
         
         if not self._check_if_project_exists(project_name=project_name):
             raise ValueError(f"Project '{project_name}' not found. Please enter a valid project name")
+        
+        if not self._check_if_dataset_exists(project_name=project_name,dataset_name=dataset_name):
+            raise ValueError(f"dataset '{dataset_name}' not found. Please enter a valid dataset name")
+
 
         self.metrics = []
+    def _check_if_dataset_exists(self,project_name,dataset_name):
+        headers = {
+            "X-Project-Name":project_name,
+            # "accept":"application/json, text/plain, */*",
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+        }
+        response = requests.get(
+            f"{RagaAICatalyst.BASE_URL}/v1/llm/sub-datasets",
+            headers=headers,
+            timeout=self.TIMEOUT,
+        )
+        response.raise_for_status()
+        logger.debug("dataset list retrieved successfully")
+        dataset_list = [
+            item['name'] for item in response.json()['data']['content']
+        ]
+        exists = dataset_name in dataset_list
+        if exists:
+            logger.info(f"dataset '{dataset_name}' exists.")
+        else:
+            logger.info(f"dataset '{dataset_name}' does not exist.")
+        return exists
+
+
+
 
     def _check_if_project_exists(self,project_name,num_projects=100):
         # TODO: 1. List All projects
