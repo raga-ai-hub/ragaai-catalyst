@@ -61,7 +61,7 @@ class Experiment:
         response.raise_for_status()
         # logger.debug("Projects list retrieved successfully")
         experiment_list = [exp["name"] for project in response.json()["data"]["content"] if project["name"] == self.project_name for exp in project["experiments"]]
-
+        # print(experiment_list)
         if self.experiment_name in experiment_list:
             raise ValueError("The experiment name already exists in the project. Enter a unique experiment name.")
 
