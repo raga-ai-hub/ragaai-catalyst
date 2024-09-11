@@ -299,7 +299,7 @@ class PromptObject:
             str: The compiled prompt with variables replaced.
 
         Raises:
-            ValueError: If there are missing or extra variables.
+            ValueError: If there are missing or extra variables, or if a value is not a string.
         """
         required_variables = set(self.get_variables())
         provided_variables = set(kwargs.keys())
@@ -314,7 +314,9 @@ class PromptObject:
 
         compiled_prompt = self.text
         for key, value in kwargs.items():
-            compiled_prompt = compiled_prompt.replace(f"{{{{{key}}}}}", str(value))
+            if not isinstance(value, str):
+                raise ValueError(f"Value for variable '{key}' must be a string, not {type(value).__name__}")
+            compiled_prompt = compiled_prompt.replace(f"{{{{{key}}}}}", value)
         return compiled_prompt
     
     def get_variables(self):
