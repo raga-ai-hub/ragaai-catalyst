@@ -5,12 +5,19 @@ import re
 from .ragaai_catalyst import RagaAICatalyst
 
 class PromptManager:
+    NUM_PROJECTS = 100
+    TIMEOUT = 10
+
     def __init__(self, project_name):
         """
         Initialize the PromptManager with a project name.
 
         Args:
             project_name (str): The name of the project.
+
+        Raises:
+            requests.RequestException: If there's an error with the API request.
+            ValueError: If the project is not found.
         """
         self.project_name = project_name
         self.headers = {
@@ -21,20 +28,34 @@ class PromptManager:
         self.base_url = f"{RagaAICatalyst.BASE_URL}/playground/prompt"
         self.timeout = 10
 
-    def get_response(self, prompt_name, version=None):
-        """
-        Get the response for a specific prompt.
+        try:
+            response = requests.get(
+                f"{RagaAICatalyst.BASE_URL}/projects",
+                params={
+                    "size": str(self.NUM_PROJECTS),
+                    "page": "0",
+                    "type": "llm",
+                },
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                },
+                timeout=self.TIMEOUT,
+            )
+            response.raise_for_status()
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error fetching projects: {str(e)}")
 
-        Args:
-            prompt_name (str): The name of the prompt.
-            version (str, optional): The version of the prompt. Defaults to None.
+        try:
+            project_list = [
+                project["name"] for project in response.json()["data"]["content"]
+            ]
+        except (KeyError, json.JSONDecodeError) as e:
+            raise ValueError(f"Error parsing project list: {str(e)}")
 
-        Returns:
-            dict: The JSON response containing the prompt data.
-        """
-        response = requests.get(f"{RagaAICatalyst.BASE_URL}/playground/prompt/version/{prompt_name}",
-                                headers=self.headers, timeout=10)
-        return response.json()
+        if self.project_name not in project_list:
+            raise ValueError("Project not found. Please enter a valid project name")
+
 
     def list_prompts(self):
         """
@@ -42,10 +63,16 @@ class PromptManager:
 
         Returns:
             list: A list of prompt names.
+
+        Raises:
+            requests.RequestException: If there's an error with the API request.
         """
         prompt = Prompt()
-        prompt_list = prompt.list_prompts(self.base_url, self.headers, self.timeout)
-        return prompt_list
+        try:
+            prompt_list = prompt.list_prompts(self.base_url, self.headers, self.timeout)
+            return prompt_list
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error listing prompts: {str(e)}")
     
     def get_prompt(self, prompt_name, version=None):
         """
@@ -57,10 +84,33 @@ class PromptManager:
 
         Returns:
             PromptObject: An object representing the prompt.
+
+        Raises:
+            ValueError: If the prompt or version is not found.
+            requests.RequestException: If there's an error with the API request.
         """
+        try:
+            prompt_list = self.list_prompts()
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error fetching prompt list: {str(e)}")
+
+        if prompt_name not in prompt_list:
+            raise ValueError("Prompt not found. Please enter a valid prompt name")
+
+        try:
+            prompt_versions = self.list_prompt_versions(prompt_name)
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error fetching prompt versions: {str(e)}")
+
+        if version and version not in prompt_versions.keys():
+            raise ValueError("Version not found. Please enter a valid version name")
+
         prompt = Prompt()
-        prompt_object = prompt.get_prompt(self.base_url, self.headers, self.timeout, prompt_name, version)
-        return prompt_object
+        try:
+            prompt_object = prompt.get_prompt(self.base_url, self.headers, self.timeout, prompt_name, version)
+            return prompt_object
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error fetching prompt: {str(e)}")
 
     def list_prompt_versions(self, prompt_name):
         """
@@ -71,10 +121,25 @@ class PromptManager:
 
         Returns:
             dict: A dictionary mapping version names to prompt texts.
+
+        Raises:
+            ValueError: If the prompt is not found.
+            requests.RequestException: If there's an error with the API request.
         """
+        try:
+            prompt_list = self.list_prompts()
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error fetching prompt list: {str(e)}")
+
+        if prompt_name not in prompt_list:
+            raise ValueError("Prompt not found. Please enter a valid prompt name")
+        
         prompt = Prompt()
-        prompt_versions = prompt.list_prompt_versions(self.base_url, self.headers, self.timeout, prompt_name)
-        return prompt_versions
+        try:
+            prompt_versions = prompt.list_prompt_versions(self.base_url, self.headers, self.timeout, prompt_name)
+            return prompt_versions
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error fetching prompt versions: {str(e)}")
 
 
 class Prompt:
@@ -95,10 +160,19 @@ class Prompt:
 
         Returns:
             list: A list of prompt names.
+
+        Raises:
+            requests.RequestException: If there's an error with the API request.
         """
-        response = requests.get(url, headers=headers, timeout=timeout)
-        prompt_list = [prompt["name"] for prompt in response.json()["data"]]                        
-        return prompt_list
+        try:
+            response = requests.get(url, headers=headers, timeout=timeout)
+            response.raise_for_status()
+            prompt_list = [prompt["name"] for prompt in response.json()["data"]]                        
+            return prompt_list
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error listing prompts: {str(e)}")
+        except (KeyError, json.JSONDecodeError) as e:
+            raise ValueError(f"Error parsing prompt list: {str(e)}")
 
     def get_prompt_by_version(self, base_url, headers, timeout, prompt_name, version):
         """
@@ -113,13 +187,22 @@ class Prompt:
 
         Returns:
             str: The text of the prompt.
+
+        Raises:
+            requests.RequestException: If there's an error with the API request.
         """
-        response = requests.get(f"{base_url}/version/{prompt_name}?version={version}",
-                                headers=headers, timeout=timeout)
-        prompt = ""
-        for text_field in response.json()["data"]["docs"][0]["textFields"]:
-            prompt += text_field['content']
-        return prompt
+        try:
+            response = requests.get(f"{base_url}/version/{prompt_name}?version={version}",
+                                    headers=headers, timeout=timeout)
+            response.raise_for_status()
+            prompt = ""
+            for text_field in response.json()["data"]["docs"][0]["textFields"]:
+                prompt += text_field['content']
+            return prompt
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error fetching prompt version: {str(e)}")
+        except (KeyError, json.JSONDecodeError, IndexError) as e:
+            raise ValueError(f"Error parsing prompt version: {str(e)}")
 
     def get_prompt(self, base_url, headers, timeout, prompt_name, version=None):
         """
@@ -134,17 +217,26 @@ class Prompt:
 
         Returns:
             PromptObject: An object representing the prompt.
+
+        Raises:
+            requests.RequestException: If there's an error with the API request.
         """
-        if version:
-            prompt_text = self.get_prompt_by_version(base_url, headers, timeout, prompt_name, version)
-        else:
-            response = requests.get(f"{base_url}/version/{prompt_name}",
-                                headers=headers, timeout=timeout)
-            prompt_text = ""
-            for text_field in response.json()["data"]["docs"][0]["textFields"]:
-                prompt_text += text_field['content']
-        
-        return PromptObject(prompt_text)
+        try:
+            if version:
+                prompt_text = self.get_prompt_by_version(base_url, headers, timeout, prompt_name, version)
+            else:
+                response = requests.get(f"{base_url}/version/{prompt_name}",
+                                    headers=headers, timeout=timeout)
+                response.raise_for_status()
+                prompt_text = ""
+                for text_field in response.json()["data"]["docs"][0]["textFields"]:
+                    prompt_text += text_field['content']
+            
+            return PromptObject(prompt_text)
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error fetching prompt: {str(e)}")
+        except (KeyError, json.JSONDecodeError, IndexError) as e:
+            raise ValueError(f"Error parsing prompt: {str(e)}")
 
     def list_prompt_versions(self, base_url, headers, timeout, prompt_name):
         """
@@ -158,14 +250,23 @@ class Prompt:
 
         Returns:
             dict: A dictionary mapping version names to prompt texts.
+
+        Raises:
+            requests.RequestException: If there's an error with the API request.
         """
-        response = requests.get(f"{base_url}/{prompt_name}/version",
-                                headers=headers, timeout=timeout)
-        version_names = [version["name"] for version in response.json()["data"]]
-        prompt_versions = {}
-        for version in version_names:
-            prompt_versions[version] = self.get_prompt_by_version(base_url, headers, timeout, prompt_name, version)
-        return prompt_versions
+        try:
+            response = requests.get(f"{base_url}/{prompt_name}/version",
+                                    headers=headers, timeout=timeout)
+            response.raise_for_status()
+            version_names = [version["name"] for version in response.json()["data"]]
+            prompt_versions = {}
+            for version in version_names:
+                prompt_versions[version] = self.get_prompt_by_version(base_url, headers, timeout, prompt_name, version)
+            return prompt_versions
+        except requests.RequestException as e:
+            raise requests.RequestException(f"Error listing prompt versions: {str(e)}")
+        except (KeyError, json.JSONDecodeError) as e:
+            raise ValueError(f"Error parsing prompt versions: {str(e)}")
 
 class PromptObject:
     def __init__(self, text):
@@ -196,7 +297,21 @@ class PromptObject:
 
         Returns:
             str: The compiled prompt with variables replaced.
+
+        Raises:
+            ValueError: If there are missing or extra variables.
         """
+        required_variables = set(self.get_variables())
+        provided_variables = set(kwargs.keys())
+
+        missing_variables = required_variables - provided_variables
+        extra_variables = provided_variables - required_variables
+
+        if missing_variables:
+            raise ValueError(f"Missing variable(s): {', '.join(missing_variables)}")
+        if extra_variables:
+            raise ValueError(f"Extra variable(s) provided: {', '.join(extra_variables)}")
+
         compiled_prompt = self.text
         for key, value in kwargs.items():
             compiled_prompt = compiled_prompt.replace(f"{{{{{key}}}}}", str(value))
