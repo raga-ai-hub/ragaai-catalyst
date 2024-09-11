@@ -49,7 +49,7 @@ class RagaAICatalyst:
         RagaAICatalyst.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://llm-platform.dev4.ragaai.ai/api"
+            else "https://llm-dev5.ragaai.ai/api"
         )
         os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
         os.environ["RAGAAI_CATALYST_SECRET_KEY"] = secret_key
@@ -145,7 +145,7 @@ class RagaAICatalyst:
         headers = {"Content-Type": "application/json"}
         json_data = {
             "accessKey": access_key,
-            "secretKey": secret_key,
+            "secretKey": secret_key
         }
 
         try:
