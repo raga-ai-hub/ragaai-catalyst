@@ -122,23 +122,24 @@ print("Experiment Status:", status)
 results = experiment_manager.get_results()
 print("Experiment Results:", results)
 ```
-### Dataset Management
+## Dataset Management
 
-Create and manage trace datasets for your projects.
-
+### Create and manage datasets for your projects.
 
 ```python
 from ragaai_catalyst import Dataset
 
 # Initialize Dataset management for a specific project
-dataset_manager = Dataset(project_name="Test-RAG-App-1")
+dataset_manager = Dataset(project_name="project_name")
 
 # List existing datasets
 datasets = dataset_manager.list_datasets()
 print("Exisiting Datasets:", datasets)
+```
 
-# Create a new dataset with filters
-dataset_manager.create_dataset(
+### 1. Create a new dataset from trace
+```python
+dataset_manager.create_from_trace(
     dataset_name='Test-dataset-1',
     filter_list=[
         {
@@ -153,3 +154,38 @@ dataset_manager.create_dataset(
     ]
 )
 ```
+
+### 2. Create a new dataset from csv
+
+#### a. `get_csv_schema()`
+Retrieves the valid schema elements that the CSV column names must map to.
+
+##### Returns
+- A dictionary with the schema elements.
+  - `success`: Boolean indicating whether the schema elements were fetched successfully.
+  - `data['schemaElements']`: List of valid schema column names.
+    
+```python
+schemaElements = dataset_manager.get_csv_schema()['data']['schemaElements']
+print('Supported column names: ', schemaElements)
+```
+
+#### b. `create_from_csv(csv_path, dataset_name, schema_mapping)`
+Uploads the CSV file to the server, performs schema mapping, and stores the dataset.
+
+##### Parameters
+- `csv_path` (str): Path to the CSV file.
+- `dataset_name` (str): The name for the dataset you want to create from this CSV.
+- `schema_mapping` (dict): Dictionary mapping CSV columns to schema elements. Must be in the format `{csv_column: schema_element}`.
+
+```python
+dataset_manager.create_from_csv(
+    csv_path='path/to/your.csv',
+    dataset_name='MyDataset',
+    schema_mapping={'column1': 'schema_element1', 'column2': 'schema_element2'}
+)
+```
+
+
+
+
