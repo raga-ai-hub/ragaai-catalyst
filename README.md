@@ -32,7 +32,7 @@ from ragaai_catalyst import RagaAICatalyst
 catalyst = RagaAICatalyst(
     access_key="YOUR_ACCESS_KEY",
     secret_key="YOUR_SECRET_KEY",
-    api_keys={"OPENAI_API_KEY": "YOUR_OPENAI_API_KEY"}
+    base_url="BASE_URL"
 )
 ```
 
