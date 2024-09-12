@@ -161,7 +161,7 @@ class RagaAICatalyst:
         if response.status_code == 400:
             token_response = response.json()
             if token_response.get("message") == "Please enter valid credentials":
-                raise Exception("Authentication failed. Navigate to Settings -> Authenticate to generate new Secret key and Access key")
+                raise Exception("Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard.")
 
         response.raise_for_status()
 
