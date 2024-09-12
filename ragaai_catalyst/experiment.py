@@ -89,7 +89,7 @@ class Experiment:
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
         }
         response = requests.get(
-            f"{RagaAICatalyst.BASE_URL}/v1/llm/sub-datasets",
+            f"{RagaAICatalyst.BASE_URL}/v1/llm/sub-datasets?projectName={project_name}",
             headers=headers,
             timeout=self.TIMEOUT,
         )
