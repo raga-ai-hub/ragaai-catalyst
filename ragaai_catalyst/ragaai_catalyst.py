@@ -147,7 +147,7 @@ class RagaAICatalyst:
         headers = {"Content-Type": "application/json"}
         json_data = {
             "accessKey": access_key,
-            "secretKey": secret_key,
+            "secretKey": secret_key
         }
 
         response = requests.post(
