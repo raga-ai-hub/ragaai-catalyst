@@ -3,11 +3,11 @@
 The Prompt Management feature in RagaAI Catalyst allows you to efficiently manage, retrieve, and use prompts in your projects. 
 
 ## Table of Contents
-1. [Ideal Flow](#ideal-flow)
-2. [Error Cases](#error-cases)
+1. [Library Detail](#library-detail)
+2. [Error Handling](#error-handling)
 3. [FAQs](#faqs)
 
-## Ideal Flow
+## Library Detail
 
 ### 1. Initialize RagaAICatalyst and PromptManager
 
@@ -88,7 +88,8 @@ print("parameters: ",parameters)
 ```
 
 
-## Error Cases
+
+## Error Handling
 
 ### 1. Project Not Found
 
