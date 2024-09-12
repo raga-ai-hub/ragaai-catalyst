@@ -262,6 +262,7 @@ class RagaAICatalyst:
                 "Unexpected error while creating project: %s", str(general_err1)
             )
             return "An unexpected error occurred while creating the project"
+        
 
     def list_projects(self, num_projects=100):
         """
@@ -344,6 +345,10 @@ class RagaAICatalyst:
             return "An unexpected error occurred while listing projects"
 
     def list_metrics(self):
+        return RagaAICatalyst.list_metrics()
+
+    @staticmethod
+    def list_metrics():
         headers = {
             "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
@@ -352,7 +357,7 @@ class RagaAICatalyst:
             response = requests.get(
                 f"{RagaAICatalyst.BASE_URL}/v1/llm/llm-metrics",
                 headers=headers,
-                timeout=self.TIMEOUT,
+                timeout=RagaAICatalyst.TIMEOUT,
             )
             response.raise_for_status()
             logger.debug("Metrics list retrieved successfully")

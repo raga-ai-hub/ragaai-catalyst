@@ -50,8 +50,73 @@ class Experiment:
             if os.getenv("RAGAAI_CATALYST_TOKEN") is not None
             else get_token()
         )
-        self.metrics = []
+        
+        if not self._check_if_project_exists(project_name=project_name):
+            raise ValueError(f"Project '{project_name}' not found. Please enter a valid project name")
+        
+        if not self._check_if_dataset_exists(project_name=project_name,dataset_name=dataset_name):
+            raise ValueError(f"dataset '{dataset_name}' not found. Please enter a valid dataset name")
 
+
+        self.metrics = []
+    def _check_if_dataset_exists(self,project_name,dataset_name):
+        headers = {
+            "X-Project-Name":project_name,
+            # "accept":"application/json, text/plain, */*",
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+        }
+        response = requests.get(
+            f"{RagaAICatalyst.BASE_URL}/v1/llm/sub-datasets",
+            headers=headers,
+            timeout=self.TIMEOUT,
+        )
+        response.raise_for_status()
+        logger.debug("dataset list retrieved successfully")
+        dataset_list = [
+            item['name'] for item in response.json()['data']['content']
+        ]
+        exists = dataset_name in dataset_list
+        if exists:
+            logger.info(f"dataset '{dataset_name}' exists.")
+        else:
+            logger.info(f"dataset '{dataset_name}' does not exist.")
+        return exists
+
+
+
+
+    def _check_if_project_exists(self,project_name,num_projects=100):
+        # TODO: 1. List All projects
+        params = {
+            "size": str(num_projects),
+            "page": "0",
+            "type": "llm",
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+        }
+        response = requests.get(
+            f"{RagaAICatalyst.BASE_URL}/projects",
+            params=params,
+            headers=headers,
+            timeout=self.TIMEOUT,
+        )
+        response.raise_for_status()
+        logger.debug("Projects list retrieved successfully")
+        project_list = [
+            project["name"] for project in response.json()["data"]["content"]
+        ]
+        
+        # TODO: 2. Check if the given project_name exists
+        # TODO: 3. Return bool (True / False output)
+        exists = project_name in project_list
+        if exists:
+            logger.info(f"Project '{project_name}' exists.")
+        else:
+            logger.info(f"Project '{project_name}' does not exist.")
+        return exists
+        
     def list_experiments(self):
         """
         Retrieves a list of experiments associated with the current project.
@@ -115,6 +180,15 @@ class Experiment:
             metrics = [metrics]
         else:
             metrics_list = metrics
+        sub_providers = ["openai","azure","gemini","groq"]
+        sub_metrics = RagaAICatalyst.list_metrics()  
+        for metric in metrics_list:
+            provider = metric.get('config', {}).get('provider', '').lower()
+            if provider and provider not in sub_providers:
+                raise ValueError("Enter a valid provider name. The following Provider names are supported: OpenAI, Azure, Gemini, Groq")
+
+            if metric['name'] not in sub_metrics:
+                raise ValueError("Enter a valid metric name. Refer to RagaAI Metric Library to select a valid metric")
 
         json_data = {
             "projectName": self.project_name,
@@ -274,14 +348,15 @@ class Experiment:
             "projectId": self.project_id,
             "filterList": [],
         }
+        base_url_without_api = Experiment.BASE_URL.removesuffix('/api')
 
         status_json = self.get_status(job_id_to_use)
         if status_json == "Failed":
             return print("Job failed. No results to fetch.")
         elif status_json == "In Progress":
-            return print("Job in progress. Please wait while the job completes.")
+            return print(f"Job in progress. Please wait while the job completes.\n Visit Job Status: {base_url_without_api}/home/job-status to track")
         elif status_json == "Completed":
-            print("Job completed. fetching results")
+            print(f"Job completed. fetching results.\n Visit Job Status: {base_url_without_api}/home/job-status to track")
 
         response = requests.post(
             f"{Experiment.BASE_URL}/v1/llm/docs",
