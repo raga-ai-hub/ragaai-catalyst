@@ -474,7 +474,10 @@ class Experiment:
             x.columns = x.columns.str.replace("_reason_metric_config", "_metric_config")
             x.columns = x.columns.str.replace("_reason_status", "_status")
 
-            x = x.drop(columns=["trace_uri"])
+            columns_list = x.columns.tolist()
+            columns_list = columns_list - ["trace_uri"]
+            # x = x.drop(columns=["trace_uri"])
+            x = x[columns_list]
 
             return True, x
 
