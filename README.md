@@ -13,6 +13,7 @@ RagaAI Catalyst is a powerful tool for managing and optimizing LLM projects. It 
     - [Trace Management](#trace-management)
     - [Experiment Management](#experiment-management)
     - [Dataset Management](#dataset-management)
+    - [Prompt Management](#prompt-management)
 
 ## Installation
 
@@ -35,6 +36,8 @@ catalyst = RagaAICatalyst(
     base_url="BASE_URL"
 )
 ```
+**Note**: Authetication to RagaAICatalyst is necessary to perform any operations below 
+
 
 ## Usage
 
@@ -122,34 +125,69 @@ print("Experiment Status:", status)
 results = experiment_manager.get_results()
 print("Experiment Results:", results)
 ```
-### Dataset Management
-
-Create and manage trace datasets for your projects.
 
 
-```python
+
+## Dataset Management
+Manage datasets efficiently for your projects:
+
+```py
 from ragaai_catalyst import Dataset
 
 # Initialize Dataset management for a specific project
-dataset_manager = Dataset(project_name="Test-RAG-App-1")
+dataset_manager = Dataset(project_name="project_name")
 
 # List existing datasets
 datasets = dataset_manager.list_datasets()
-print("Exisiting Datasets:", datasets)
+print("Existing Datasets:", datasets)
 
-# Create a new dataset with filters
-dataset_manager.create_dataset(
+# Create a dataset from trace
+dataset_manager.create_from_trace(
     dataset_name='Test-dataset-1',
     filter_list=[
-        {
-            "name": "llm_model",
-            "values": ["gpt-3.5-turbo", "gpt-4"]
-        },
-        {
-            "name": "prompt_length",
-            "lte": 27,
-            "gte": 23
-        }
+        {"name": "llm_model", "values": ["gpt-3.5-turbo", "gpt-4"]},
+        {"name": "prompt_length", "lte": 27, "gte": 23}
     ]
 )
+
+# Create a dataset from CSV
+dataset_manager.create_from_csv(
+    csv_path='path/to/your.csv',
+    dataset_name='MyDataset',
+    schema_mapping={'column1': 'schema_element1', 'column2': 'schema_element2'}
+)
 ```
+
+For more detailed information on Dataset Management, including CSV schema handling and advanced usage, please refer to the [Dataset Management documentation](docs/dataset_management.md).
+
+## Prompt Management
+
+Manage and use prompts efficiently in your projects:
+
+```py
+from ragaai_catalyst.prompt_manager import PromptManager
+
+# Initialize PromptManager
+prompt_manager = PromptManager("your-project-name")
+
+# List available prompts
+prompts = prompt_manager.list_prompts()
+print("Available prompts:", prompts)
+
+# Get a specific prompt
+prompt_name = "your_prompt_name"
+prompt = prompt_manager.get_prompt(prompt_name)
+
+# Compile a prompt with variables
+compiled_prompt = prompt.compile(query="What's the weather?", context="sunny", llm_response="It's sunny today")
+print("Compiled prompt:", compiled_prompt)
+
+# Get prompt parameters
+parameters = prompt.get_parameters()
+print("Prompt parameters:", parameters)
+```
+
+For more detailed information on Prompt Management, please refer to the [Prompt Management documentation](docs/prompt_management.md).
+
+
+
