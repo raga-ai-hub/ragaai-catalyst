@@ -54,16 +54,21 @@ class RagaAICatalyst:
 
         self.api_keys = api_keys or {}
 
-        if self.api_keys:
-            self._upload_keys()
-
         if base_url:
             RagaAICatalyst.BASE_URL = base_url
             try:
-                self.get_token()
                 os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
             except requests.exceptions.RequestException:
-                raise ConnectionError("The provided base_url is not accessible. Please re-check the base_url.")
+                raise ConnectionError(
+                    "The provided base_url is not accessible. Please re-check the base_url."
+                )
+
+        # Get the token from the server
+        self.get_token()
+
+        # Set the API keys, if  available
+        if self.api_keys:
+            self._upload_keys()
 
     def _set_access_key_secret_key(self, access_key, secret_key):
         os.environ["RAGAAI_CATALYST_ACCESS_KEY"] = access_key
@@ -145,10 +150,7 @@ class RagaAICatalyst:
             return None
 
         headers = {"Content-Type": "application/json"}
-        json_data = {
-            "accessKey": access_key,
-            "secretKey": secret_key
-        }
+        json_data = {"accessKey": access_key, "secretKey": secret_key}
 
         response = requests.post(
             f"{ RagaAICatalyst.BASE_URL}/token",
@@ -161,7 +163,9 @@ class RagaAICatalyst:
         if response.status_code == 400:
             token_response = response.json()
             if token_response.get("message") == "Please enter valid credentials":
-                raise Exception("Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard.")
+                raise Exception(
+                    "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
+                )
 
         response.raise_for_status()
 
@@ -182,7 +186,6 @@ class RagaAICatalyst:
         else:
             logger.error("Token(s) not set")
             return None
-
 
     def create_project(self, project_name, type="llm", description=""):
         """
@@ -253,7 +256,6 @@ class RagaAICatalyst:
                 "Unexpected error while creating project: %s", str(general_err1)
             )
             return "An unexpected error occurred while creating the project"
-        
 
     def list_projects(self, num_projects=100):
         """
