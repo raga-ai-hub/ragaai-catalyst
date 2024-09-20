@@ -3,7 +3,7 @@ import requests
 import json
 import re
 from .ragaai_catalyst import RagaAICatalyst
-import pdb
+import copy
 
 class PromptManager:
     NUM_PROJECTS = 100
@@ -195,7 +195,7 @@ class Prompt:
             raise ValueError(f"Error parsing prompt version: {str(e)}")
         return response
 
-    def get_response(self, base_url, headers, timeout, prompt_name, version):
+    def get_response(self, base_url, headers, timeout, prompt_name):
         try:
             response = requests.get(f"{base_url}/version/{prompt_name}",
                                 headers=headers, timeout=timeout)
@@ -299,19 +299,29 @@ class PromptObject:
             model (str): The model of the prompt.
         """
         self.text = text
-        self.variables = self._extract_variables()
         self.parameters = parameters
         self.model = model
 
-    def _extract_variables(self):
+    def _extract_content(self):
         """
         Extract variables from the prompt text.
 
         Returns:
             list: A list of variable names found in the prompt text.
         """
-        user_content = next(item["content"] for item in self.text if item["role"] == "user")
-        return [var.strip('{}') for var in user_content.split('{{')[1:]]
+        system_content = ""
+        user_content = ""
+        assistant_content = ""
+        for item in self.text:
+            if item.get("role") == "user":
+                user_content = item.get("content", "")
+            elif item.get("role") == "system":
+                system_content = item.get("content", "")
+            elif item.get("role") == "assistant":
+                assistant_content = item.get("content", "")
+        
+
+        return system_content, user_content, assistant_content
     
     def compile(self, **kwargs):
         """
@@ -326,27 +336,52 @@ class PromptObject:
         Raises:
             ValueError: If there are missing or extra variables, or if a value is not a string.
         """
-        required_variables = set(self.get_variables())
+        all_variables = self.get_variables()
+        # print(all_variables)
+        system_variables = all_variables["system"]
+        user_variables = all_variables["user"]
+        assistant_variables = all_variables["assistant"]
+
+        required_variables = system_variables + user_variables + assistant_variables
+        required_variables = list(set(required_variables))
         provided_variables = set(kwargs.keys())
+        # print(required_variables)
+        # print(provided_variables)
 
-        missing_variables = required_variables - provided_variables
-        extra_variables = provided_variables - required_variables
-
+        missing_variables = [item for item in required_variables if item not in provided_variables]
+        extra_variables = [item for item in provided_variables if item not in required_variables]
+        # print(missing_variables)
+        # print(extra_variables)
         if missing_variables:
             raise ValueError(f"Missing variable(s): {', '.join(missing_variables)}")
         if extra_variables:
             raise ValueError(f"Extra variable(s) provided: {', '.join(extra_variables)}")
-        # pdb.set_trace()
 
-        # compiled_prompt = self.text
-        user_content = next(item["content"] for item in self.text if item["role"] == "user")
+
+        system_content, user_content, assistant_content = self._extract_content()
+        # user_content = next(item["content"] for item in self.text if item["role"] == "user")
 
         for key, value in kwargs.items():
             if not isinstance(value, str):
                 raise ValueError(f"Value for variable '{key}' must be a string, not {type(value).__name__}")
-            user_content = user_content.replace(f"{{{{{key}}}}}", value)
-        compiled_prompt = [{"content": user_content if item["role"] == "user" else item["content"], "role": item["role"]} for item in self.text]
-        return compiled_prompt
+            if key in user_variables:                
+                user_content = user_content.replace(f"{{{{{key}}}}}", value)
+            if key in system_variables:
+                system_content = system_content.replace(f"{{{{{key}}}}}", value)
+            if key in assistant_variables:
+                assistant_content = assistant_content.replace(f"{{{{{key}}}}}", value)
+
+        updated_text = copy.deepcopy(self.text)
+
+        for item in updated_text:
+            if item.get('role') == 'system':
+                item['content'] = system_content
+            elif item['role'] == 'user':
+                item['content'] = user_content
+            elif item["role"] == "assistant":
+                item["content"] = assistant_content
+
+        return updated_text
     
     def get_variables(self):
         """
@@ -355,13 +390,21 @@ class PromptObject:
         Returns:
             list: A list of variable names found in the prompt text.
         """
+        system_content, user_content, assistant_content = self._extract_content()
         pattern = r'\{\{(.*?)\}\}'
-        user_content = next(item["content"] for item in self.text if item["role"] == "user")
-        matches = re.findall(pattern, user_content)
-        return [match.strip() for match in matches if '"' not in match]
+
+        matches_system = re.findall(pattern, system_content)
+        matches_user = re.findall(pattern, user_content)
+        matches_assistant = re.findall(pattern, assistant_content)
+
+        system_variables = [match.strip() for match in matches_system if '"' not in match]
+        user_variables = [match.strip() for match in matches_user if '"' not in match]
+        assistant_variables = [match.strip() for match in matches_assistant if '"' not in match]
+
+        return {"system": system_variables, "user": user_variables, "assistant": assistant_variables}
     
     # Function to convert value based on type
-    def convert_value(self, value, type_):
+    def _convert_value(self, value, type_):
         if type_ == "float":
             return float(value)
         elif type_ == "int":
@@ -375,7 +418,7 @@ class PromptObject:
         Returns:
             dict: A dictionary of parameters found in the prompt text.
         """
-        parameters = {param["name"]: self.convert_value(param["value"], param["type"]) for param in self.parameters}
+        parameters = {param["name"]: self._convert_value(param["value"], param["type"]) for param in self.parameters}
         parameters["model"] = self.model
         return parameters
     
