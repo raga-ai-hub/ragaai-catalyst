@@ -54,16 +54,11 @@ class RagaAICatalyst:
 
         self.api_keys = api_keys or {}
 
-        if self.api_keys:
-            self._upload_keys()
-
         if base_url:
             RagaAICatalyst.BASE_URL = base_url
             try:
                 self.get_token()
                 os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
-                # Get the token from the server
-                self.get_token()
             except requests.exceptions.RequestException:
                 raise ConnectionError(
                     "The provided base_url is not accessible. Please re-check the base_url."
