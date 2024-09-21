@@ -164,6 +164,7 @@ class Prompt:
 
         Raises:
             requests.RequestException: If there's an error with the API request.
+            ValueError: If there's an error parsing the prompt list.
         """
         try:
             response = requests.get(url, headers=headers, timeout=timeout)
@@ -175,7 +176,7 @@ class Prompt:
         except (KeyError, json.JSONDecodeError) as e:
             raise ValueError(f"Error parsing prompt list: {str(e)}")
 
-    def get_response_by_version(self, base_url, headers, timeout, prompt_name, version):
+    def _get_response_by_version(self, base_url, headers, timeout, prompt_name, version):
         """
         Get a specific version of a prompt.
 
@@ -184,7 +185,15 @@ class Prompt:
             headers (dict): The headers to be used in the request.
             timeout (int): The timeout for the request.
             prompt_name (str): The name of the prompt.
-            version (str): The version of the prompt."""
+            version (str): The version of the prompt.
+
+        Returns:
+            response: The response object containing the prompt version data.
+
+        Raises:
+            requests.RequestException: If there's an error with the API request.
+            ValueError: If there's an error parsing the prompt version.
+        """
         try:
             response = requests.get(f"{base_url}/version/{prompt_name}?version={version}",
                                     headers=headers, timeout=timeout)
@@ -195,7 +204,23 @@ class Prompt:
             raise ValueError(f"Error parsing prompt version: {str(e)}")
         return response
 
-    def get_response(self, base_url, headers, timeout, prompt_name):
+    def _get_response(self, base_url, headers, timeout, prompt_name):
+        """
+        Get the latest version of a prompt.
+
+        Args:
+            base_url (str): The base URL for the API.
+            headers (dict): The headers to be used in the request.
+            timeout (int): The timeout for the request.
+            prompt_name (str): The name of the prompt.
+
+        Returns:
+            response: The response object containing the latest prompt version data.
+
+        Raises:
+            requests.RequestException: If there's an error with the API request.
+            ValueError: If there's an error parsing the prompt version.
+        """
         try:
             response = requests.get(f"{base_url}/version/{prompt_name}",
                                 headers=headers, timeout=timeout)
@@ -206,7 +231,7 @@ class Prompt:
             raise ValueError(f"Error parsing prompt version: {str(e)}")
         return response
 
-    def get_prompt_by_version(self, base_url, headers, timeout, prompt_name, version):
+    def _get_prompt_by_version(self, base_url, headers, timeout, prompt_name, version):
         """
         Get a specific version of a prompt.
 
@@ -223,7 +248,7 @@ class Prompt:
         Raises:
             requests.RequestException: If there's an error with the API request.
         """
-        response = self.get_response_by_version(base_url, headers, timeout, prompt_name, version)
+        response = self._get_response_by_version(base_url, headers, timeout, prompt_name, version)
         prompt_text = response.json()["data"]["docs"][0]["textFields"]
         return prompt_text
 
@@ -245,12 +270,12 @@ class Prompt:
             requests.RequestException: If there's an error with the API request.
         """
         if version:
-            response = self.get_response_by_version(base_url, headers, timeout, prompt_name, version)
+            response = self._get_response_by_version(base_url, headers, timeout, prompt_name, version)
             prompt_text = response.json()["data"]["docs"][0]["textFields"]
             prompt_parameters = response.json()["data"]["docs"][0]["modelSpecs"]["parameters"]
             model = response.json()["data"]["docs"][0]["modelSpecs"]["model"]
         else:
-            response = self.get_response(base_url, headers, timeout, prompt_name)
+            response = self._get_response(base_url, headers, timeout, prompt_name)
             prompt_text = response.json()["data"]["docs"][0]["textFields"]
             prompt_parameters = response.json()["data"]["docs"][0]["modelSpecs"]["parameters"]
             model = response.json()["data"]["docs"][0]["modelSpecs"]["model"]
@@ -272,6 +297,7 @@ class Prompt:
 
         Raises:
             requests.RequestException: If there's an error with the API request.
+            ValueError: If there's an error parsing the prompt versions.
         """
         try:
             response = requests.get(f"{base_url}/{prompt_name}/version",
@@ -280,7 +306,7 @@ class Prompt:
             version_names = [version["name"] for version in response.json()["data"]]
             prompt_versions = {}
             for version in version_names:
-                prompt_versions[version] = self.get_prompt_by_version(base_url, headers, timeout, prompt_name, version)
+                prompt_versions[version] = self._get_prompt_by_version(base_url, headers, timeout, prompt_name, version)
             return prompt_versions
         except requests.RequestException as e:
             raise requests.RequestException(f"Error listing prompt versions: {str(e)}")
@@ -301,28 +327,41 @@ class PromptObject:
         self.text = text
         self.parameters = parameters
         self.model = model
-
-    def _extract_content(self):
+    
+    def _extract_variable_from_content(self, content):
         """
-        Extract variables from the prompt text.
+        Extract variables from the content.
+
+        Args:
+            content (str): The content containing variables.
 
         Returns:
-            list: A list of variable names found in the prompt text.
+            list: A list of variable names found in the content.
         """
-        system_content = ""
-        user_content = ""
-        assistant_content = ""
-        for item in self.text:
-            if item.get("role") == "user":
-                user_content = item.get("content", "")
-            elif item.get("role") == "system":
-                system_content = item.get("content", "")
-            elif item.get("role") == "assistant":
-                assistant_content = item.get("content", "")
-        
+        pattern = r'\{\{(.*?)\}\}'
+        matches = re.findall(pattern, content)
+        variables = [match.strip() for match in matches if '"' not in match]
+        return variables
 
-        return system_content, user_content, assistant_content
-    
+    def _add_variable_value_to_content(self, content, user_variables):
+        """
+        Add variable values to the content.
+
+        Args:
+            content (str): The content containing variables.
+            user_variables (dict): A dictionary of user-provided variable values.
+
+        Returns:
+            str: The content with variables replaced by their values.
+        """
+        variables = self._extract_variable_from_content(content)
+        for key, value in user_variables.items():
+            if not isinstance(value, str):
+                raise ValueError(f"Value for variable '{key}' must be a string, not {type(value).__name__}")
+            if key in variables:
+                content = content.replace(f"{{{{{key}}}}}", value)
+        return content
+
     def compile(self, **kwargs):
         """
         Compile the prompt by replacing variables with provided values.
@@ -336,50 +375,21 @@ class PromptObject:
         Raises:
             ValueError: If there are missing or extra variables, or if a value is not a string.
         """
-        all_variables = self.get_variables()
-        # print(all_variables)
-        system_variables = all_variables["system"]
-        user_variables = all_variables["user"]
-        assistant_variables = all_variables["assistant"]
-
-        required_variables = system_variables + user_variables + assistant_variables
-        required_variables = list(set(required_variables))
+        required_variables = self.get_variables()
         provided_variables = set(kwargs.keys())
-        # print(required_variables)
-        # print(provided_variables)
 
         missing_variables = [item for item in required_variables if item not in provided_variables]
         extra_variables = [item for item in provided_variables if item not in required_variables]
-        # print(missing_variables)
-        # print(extra_variables)
+
         if missing_variables:
             raise ValueError(f"Missing variable(s): {', '.join(missing_variables)}")
         if extra_variables:
             raise ValueError(f"Extra variable(s) provided: {', '.join(extra_variables)}")
 
-
-        system_content, user_content, assistant_content = self._extract_content()
-        # user_content = next(item["content"] for item in self.text if item["role"] == "user")
-
-        for key, value in kwargs.items():
-            if not isinstance(value, str):
-                raise ValueError(f"Value for variable '{key}' must be a string, not {type(value).__name__}")
-            if key in user_variables:                
-                user_content = user_content.replace(f"{{{{{key}}}}}", value)
-            if key in system_variables:
-                system_content = system_content.replace(f"{{{{{key}}}}}", value)
-            if key in assistant_variables:
-                assistant_content = assistant_content.replace(f"{{{{{key}}}}}", value)
-
         updated_text = copy.deepcopy(self.text)
 
         for item in updated_text:
-            if item.get('role') == 'system':
-                item['content'] = system_content
-            elif item['role'] == 'user':
-                item['content'] = user_content
-            elif item["role"] == "assistant":
-                item["content"] = assistant_content
+            item["content"] = self._add_variable_value_to_content(item["content"], kwargs)
 
         return updated_text
     
@@ -390,21 +400,27 @@ class PromptObject:
         Returns:
             list: A list of variable names found in the prompt text.
         """
-        system_content, user_content, assistant_content = self._extract_content()
-        pattern = r'\{\{(.*?)\}\}'
-
-        matches_system = re.findall(pattern, system_content)
-        matches_user = re.findall(pattern, user_content)
-        matches_assistant = re.findall(pattern, assistant_content)
-
-        system_variables = [match.strip() for match in matches_system if '"' not in match]
-        user_variables = [match.strip() for match in matches_user if '"' not in match]
-        assistant_variables = [match.strip() for match in matches_assistant if '"' not in match]
-
-        return {"system": system_variables, "user": user_variables, "assistant": assistant_variables}
+        variables = set()
+        for item in self.text:
+            content = item["content"]
+            for var in self._extract_variable_from_content(content):
+                variables.add(var)
+        if variables:
+            return list(variables)
+        else:
+            return []
     
-    # Function to convert value based on type
     def _convert_value(self, value, type_):
+        """
+        Convert value based on type.
+
+        Args:
+            value: The value to be converted.
+            type_ (str): The type to convert the value to.
+
+        Returns:
+            The converted value.
+        """
         if type_ == "float":
             return float(value)
         elif type_ == "int":
@@ -420,6 +436,4 @@ class PromptObject:
         """
         parameters = {param["name"]: self._convert_value(param["value"], param["type"]) for param in self.parameters}
         parameters["model"] = self.model
-        return parameters
-    
-    
+        return parameters    
