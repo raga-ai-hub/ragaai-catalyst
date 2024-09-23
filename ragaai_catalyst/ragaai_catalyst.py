@@ -57,7 +57,6 @@ class RagaAICatalyst:
         if base_url:
             RagaAICatalyst.BASE_URL = base_url
             try:
-                self.get_token()
                 os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
             except requests.exceptions.RequestException:
                 raise ConnectionError(
@@ -151,10 +150,7 @@ class RagaAICatalyst:
             return None
 
         headers = {"Content-Type": "application/json"}
-        json_data = {
-            "accessKey": access_key,
-            "secretKey": secret_key,
-        }
+        json_data = {"accessKey": access_key, "secretKey": secret_key}
 
         response = requests.post(
             f"{ RagaAICatalyst.BASE_URL}/token",
@@ -167,7 +163,9 @@ class RagaAICatalyst:
         if response.status_code == 400:
             token_response = response.json()
             if token_response.get("message") == "Please enter valid credentials":
-                raise Exception("Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard.")
+                raise Exception(
+                    "Authentication failed. Invalid credentials provided. Please check your Access key and Secret key. \nTo view or create new keys, navigate to Settings -> Authenticate in the RagaAI Catalyst dashboard."
+                )
 
         response.raise_for_status()
 
@@ -188,7 +186,6 @@ class RagaAICatalyst:
         else:
             logger.error("Token(s) not set")
             return None
-
 
     def create_project(self, project_name, type="llm", description=""):
         """
@@ -341,6 +338,10 @@ class RagaAICatalyst:
             return "An unexpected error occurred while listing projects"
 
     def list_metrics(self):
+        return RagaAICatalyst.list_metrics()
+
+    @staticmethod
+    def list_metrics():
         headers = {
             "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
@@ -349,7 +350,7 @@ class RagaAICatalyst:
             response = requests.get(
                 f"{RagaAICatalyst.BASE_URL}/v1/llm/llm-metrics",
                 headers=headers,
-                timeout=self.TIMEOUT,
+                timeout=RagaAICatalyst.TIMEOUT,
             )
             response.raise_for_status()
             logger.debug("Metrics list retrieved successfully")
