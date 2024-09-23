@@ -427,7 +427,7 @@ class PromptObject:
             return int(value)
         return value  # Default case, return as is
 
-    def get_parameters(self):
+    def get_model_parameters(self):
         """
         Get all parameters in the prompt text.
 
@@ -437,3 +437,6 @@ class PromptObject:
         parameters = {param["name"]: self._convert_value(param["value"], param["type"]) for param in self.parameters}
         parameters["model"] = self.model
         return parameters    
+    
+    def get_prompt_content(self):
+        return self.text
