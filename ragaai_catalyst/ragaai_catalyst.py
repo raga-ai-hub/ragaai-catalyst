@@ -57,6 +57,7 @@ class RagaAICatalyst:
         if base_url:
             RagaAICatalyst.BASE_URL = base_url
             try:
+                self.get_token()
                 os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
             except requests.exceptions.RequestException:
                 raise ConnectionError(
