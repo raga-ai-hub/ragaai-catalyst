@@ -200,6 +200,11 @@ class RagaAICatalyst:
         Returns:
             str: A message indicating the success or failure of the project creation.
         """
+        # Check if the project already exists
+        existing_projects = self.list_projects()
+        if project_name in existing_projects:
+            raise ValueError(f"Project name '{project_name}' already exists. Please choose a different name.")
+
         json_data = {"name": project_name, "type": type, "description": description}
         headers = {
             "Content-Type": "application/json",
