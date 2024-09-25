@@ -242,6 +242,10 @@ class RagaAICatalyst:
         if project_name in existing_projects:
             raise ValueError(f"Project name '{project_name}' already exists. Please choose a different name.")
 
+        usecase_list = self.project_use_cases()
+        if usecase not in usecase_list:
+            raise ValueError(f"Select a valid usecase from {usecase_list}")
+        
         json_data = {"name": project_name, "type": type, "usecase": usecase}
         headers = {
             "Content-Type": "application/json",
