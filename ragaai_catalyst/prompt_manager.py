@@ -21,41 +21,39 @@ class PromptManager:
             ValueError: If the project is not found.
         """
         self.project_name = project_name
-        self.headers = {
-                "Content-Type": "application/json",
-                "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-                "X-Project-Name": self.project_name
-            }
         self.base_url = f"{RagaAICatalyst.BASE_URL}/playground/prompt"
         self.timeout = 10
+        self.size = 100 #Number of projects to fetch
 
         try:
             response = requests.get(
-                f"{RagaAICatalyst.BASE_URL}/projects",
-                params={
-                    "size": str(self.NUM_PROJECTS),
-                    "page": "0",
-                    "type": "llm",
-                },
+                f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={self.size}",
                 headers={
-                    "Content-Type": "application/json",
                     "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
                 },
-                timeout=self.TIMEOUT,
+                timeout=self.timeout,
             )
             response.raise_for_status()
-        except requests.RequestException as e:
-            raise requests.RequestException(f"Error fetching projects: {str(e)}")
+            # logger.debug("Projects list retrieved successfully")
 
-        try:
             project_list = [
                 project["name"] for project in response.json()["data"]["content"]
             ]
+            self.project_id = [
+            project["id"] for project in response.json()["data"]["content"] if project["name"]==project_name
+            ][0]
+
         except (KeyError, json.JSONDecodeError) as e:
             raise ValueError(f"Error parsing project list: {str(e)}")
 
         if self.project_name not in project_list:
             raise ValueError("Project not found. Please enter a valid project name")
+
+
+        self.headers = {
+                "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                "X-Project-Id": str(self.project_id)
+            }
 
 
     def list_prompts(self):

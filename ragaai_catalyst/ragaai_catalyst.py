@@ -188,7 +188,44 @@ class RagaAICatalyst:
             logger.error("Token(s) not set")
             return None
 
-    def create_project(self, project_name, type="llm", description=""):
+    def project_use_cases(self):
+        try:
+            headers = {
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+            }
+            response = requests.get(
+                f"{RagaAICatalyst.BASE_URL}/v2/llm/usecase",
+                headers=headers,
+                timeout=self.TIMEOUT
+            )
+            response.raise_for_status()  # Use raise_for_status to handle HTTP errors
+            usecase = response.json()["data"]["usecase"]
+            return usecase
+        except:
+            pass
+        # except requests.exceptions.HTTPError as http_err:
+        #     # Specific message for HTTP errors
+        #     logger.error(f"HTTP error occurred: {http_err}")
+        #     return f"HTTP error occurred: {http_err}"
+        # except requests.exceptions.ConnectionError as conn_err:
+        #     # Specific message for Connection errors
+        #     logger.error(f"Connection error occurred: {conn_err}")
+        #     return f"Connection error occurred: {conn_err}"
+        # except requests.exceptions.Timeout as timeout_err:
+        #     # Specific message for Timeout errors
+        #     logger.error(f"Timeout error occurred: {timeout_err}")
+        #     return f"Timeout error occurred: {timeout_err}"
+        # except requests.exceptions.RequestException as req_err:
+        #     # General request exception catch-all
+        #     logger.error(f"An error occurred: {req_err}")
+        #     return f"An error occurred: {req_err}"
+        # except Exception as e:
+        #     # General exception catch-all
+        #     logger.error(f"An unexpected error occurred: {e}")
+        #     return f"An unexpected error occurred: {e}"
+
+
+    def create_project(self, project_name, usecase="Q/A", type="llm"):
         """
         Creates a project with the given project_name, type, and description.
 
@@ -205,23 +242,23 @@ class RagaAICatalyst:
         if project_name in existing_projects:
             raise ValueError(f"Project name '{project_name}' already exists. Please choose a different name.")
 
-        json_data = {"name": project_name, "type": type, "description": description}
+        json_data = {"name": project_name, "type": type, "usecase": usecase}
         headers = {
             "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
         }
         try:
             response = requests.post(
-                f"{RagaAICatalyst.BASE_URL}/projects",
+                f"{RagaAICatalyst.BASE_URL}/v2/llm/project",
                 headers=headers,
                 json=json_data,
                 timeout=self.TIMEOUT,
             )
             response.raise_for_status()
             print(
-                f"Project Created Successfully with name {response.json()['data']['name']}"
+                f"Project Created Successfully with name {response.json()['data']['name']} & usecase {usecase}"
             )
-            return f'Project Created Successfully with name {response.json()["data"]["name"]}'
+            return f'Project Created Successfully with name {response.json()["data"]["name"]} & usecase {usecase}'
 
         except requests.exceptions.HTTPError as http_err:
             if response.status_code == 401:
@@ -232,7 +269,7 @@ class RagaAICatalyst:
                 )
                 try:
                     response = requests.post(
-                        f"{RagaAICatalyst.BASE_URL}/projects",
+                        f"{RagaAICatalyst.BASE_URL}/v2/llm/project",
                         headers=headers,
                         json=json_data,
                         timeout=self.TIMEOUT,
@@ -263,6 +300,9 @@ class RagaAICatalyst:
             )
             return "An unexpected error occurred while creating the project"
 
+    def get_project_id(self, project_name):
+        pass
+
     def list_projects(self, num_projects=100):
         """
         Retrieves a list of projects with the specified number of projects.
@@ -273,25 +313,18 @@ class RagaAICatalyst:
         Returns:
             list: A list of project names retrieved successfully.
         """
-        params = {
-            "size": str(num_projects),
-            "page": "0",
-            "type": "llm",
-        }
         headers = {
-            "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
         }
         try:
             response = requests.get(
-                f"{RagaAICatalyst.BASE_URL}/projects",
-                params=params,
+                f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={num_projects}",
                 headers=headers,
                 timeout=self.TIMEOUT,
             )
             response.raise_for_status()
             logger.debug("Projects list retrieved successfully")
-            # return [project["name"] for project in response.json()["data"]["content"]]
+
             project_list = [
                 project["name"] for project in response.json()["data"]["content"]
             ]
@@ -306,8 +339,7 @@ class RagaAICatalyst:
                 )
                 try:
                     response = requests.get(
-                        f"{RagaAICatalyst.BASE_URL}/projects",
-                        params=params,
+                        f"{RagaAICatalyst.BASE_URL}/v2/llm/projects",
                         headers=headers,
                         timeout=self.TIMEOUT,
                     )

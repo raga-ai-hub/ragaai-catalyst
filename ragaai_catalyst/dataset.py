@@ -19,8 +19,26 @@ class Dataset:
         Dataset.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
-            else "https://llm-platform.prod5.ragaai.ai/api"
+            else "https://catalyst.raga.ai/api"
         )
+        headers = {
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+        }
+        try:
+            response = requests.get(
+                f"{Dataset.BASE_URL}/v2/llm/projects",
+                headers=headers,
+                timeout=self.TIMEOUT,
+            )
+            response.raise_for_status()
+            logger.debug("Projects list retrieved successfully")
+
+            self.project_id = [
+                project["id"] for project in response.json()["data"]["content"] if project["name"]==project_name
+            ][0]
+
+        except:
+            pass
 
     def list_datasets(self):
         """
@@ -35,17 +53,15 @@ class Dataset:
 
         def make_request():
             headers = {
-                "accept": "application/json, text/plain, */*",
-                "authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-                "X-Project-Name": self.project_name,
+                'Content-Type': 'application/json',
+                "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Id": str(self.project_id),
             }
-            params = {
-                "projectName": self.project_name,
-            }
-            response = requests.get(
-                f"{Dataset.BASE_URL}/v1/llm/sub-datasets",
+            json_data = {"size": 12, "page": "0", "projectId": str(self.project_id), "search": ""}
+            response = requests.post(
+                f"{Dataset.BASE_URL}/v2/llm/dataset",
                 headers=headers,
-                params=params,
+                json=json_data,
                 timeout=Dataset.TIMEOUT,
             )
             return response
@@ -61,8 +77,13 @@ class Dataset:
                 "message": response.json(),
             }
         datasets = response.json()["data"]["content"]
-        sub_datasets = [dataset["name"] for dataset in datasets]
-        return sub_datasets
+        dataset_list = [dataset["name"] for dataset in datasets]
+        
+        return dataset_list
+
+    def get_schema_mapping(self):
+        return ["traceid", "prompt", "context", "response", "expected_response", "expected_context", "timestamp", "metadata", "pipeline", "cost", "feedBack", "latency", "sanitized_response", "system_prompt", "traceUri"]
+
 
     def create_from_trace(self, dataset_name, filter_list):
         """
@@ -133,28 +154,14 @@ class Dataset:
 
 
     def create_from_csv(self, csv_path, dataset_name, schema_mapping):
-
-        ## check the validity of schema_mapping
-        df = pd.read_csv(csv_path)
-        keys = list(df.columns)
-        values = self.get_csv_schema()['data']['schemaElements']
-        print(type(values), values)
-        for k in schema_mapping.keys():
-            if k not in keys:
-                raise ValueError(f'--{k}-- column is not present in csv column but present in schema_mapping. Plase provide the right schema_mapping.')
-        for k in schema_mapping.values():
-            if k not in values:
-                raise ValueError(f'--{k}-- is not present in the schema_elements but present in schema_mapping. Plase provide the right schema_mapping.')
-        
-
         #### get presigned URL
         def get_presignedUrl():
             headers = {
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-                "X-Project-Name": self.project_name,
+                "X-Project-Id": str(self.project_id),
             }
             response = requests.get(
-                f"{Dataset.BASE_URL}/v1/llm/presignedUrl/test-url",
+                f"{Dataset.BASE_URL}/v2/llm/dataset/csv/presigned-url",
                 headers=headers,
                 timeout=Dataset.TIMEOUT,
             )
@@ -164,8 +171,8 @@ class Dataset:
         if presignedUrl['success']:
             url = presignedUrl['data']['presignedUrl']
             filename = presignedUrl['data']['fileName']
-            print('-- PresignedUrl fetched Succussfuly --')
-            print('filename: ', filename)
+            # print('-- PresignedUrl fetched Succussfuly --')
+            # print('filename: ', filename)
         else:
             raise ValueError('Unable to fetch presignedUrl')
         
@@ -189,21 +196,23 @@ class Dataset:
         
         
         put_csv_response = put_csv_to_presignedUrl(url)
-        if put_csv_response.status_code != 201:
-            raise ValueError('Unable to put csv to the presignedUrl')
+        if put_csv_response.status_code == 200:
+            # print('-- csv put to presignedUrl Succussfuly --')
+            pass
         else:
-            print('-- csv put to presignedUrl Succussfuly --')
+            raise ValueError('Unable to put csv to the presignedUrl')
         
 
 
         ## Upload csv to elastic
         def upload_csv_to_elastic(data):
             header = {
+                'Content-Type': 'application/json',
                 'Authorization': f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-                'X-Project-Name': self.project_name
+                "X-Project-Id": str(self.project_id)
             }
             response = requests.post(
-                f"{Dataset.BASE_URL}/v1/llm/csv-dataset",
+                f"{Dataset.BASE_URL}/v2/llm/dataset/csv",
                 headers=header,
                 json=data,
                 timeout=Dataset.TIMEOUT,
@@ -211,15 +220,25 @@ class Dataset:
 
             return response.json()
         
+        def generate_schema(mapping):
+            result = {}
+            for column, schema_element in mapping.items():
+                result[column] = {"columnType": schema_element}
+            return result
+        
+        schema_mapping = generate_schema(schema_mapping)
+        
         data = {
+            "projectId": str(self.project_id),
             "datasetName": dataset_name,
             "fileName": filename,
-            "schemaMapping": schema_mapping
+            "schemaMapping": schema_mapping,
+            "opType": "insert",
+            "description": ""
         }
-        print(data)
+        # print(data)
 
         upload_csv_response = upload_csv_to_elastic(data)
-        print(type(upload_csv_response), upload_csv_response)
         if not upload_csv_response['success']:
             raise ValueError('Unable to upload csv')
         else:
