@@ -10,10 +10,9 @@ logger = logging.getLogger(__name__)
 
 class Evaluation:
 
-    def __init__(self, project_name, dataset_name, column_name):
+    def __init__(self, project_name, dataset_name):
         self.project_name = project_name
         self.dataset_name = dataset_name
-        self.column_name = column_name
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 10
         self.jobId = None
@@ -78,7 +77,7 @@ class Evaluation:
         except:
             pass
 
-    def _get_mapping(self, metric_name, metrics_schema):
+    def get_mapping(self, metric_name, metrics_schema):
         mapping = []
         for schema in metrics_schema:
             if schema["name"]==metric_name:
@@ -89,33 +88,28 @@ class Evaluation:
                     mapping.append({"schemaName": schemaName, "variableName": variableName})
         return mapping
 
-    def _get_metrics_base_schema(self):
+    def _get_metricParams(self):
         return {
-            "datasetId": "datasetId",
-            "metricParams": [
-                {
-                    "metricSpec": {
-                        "name": "metric_to_evaluate",
-                        "config": {
-                            "model": "null",
-                            "params": {
-                                "model": {
-                                    "value": "gpt-4o"
-                                },
-                                "threshold": {
-                                    "gte": 0.5
-                                }
+                "metricSpec": {
+                    "name": "metric_to_evaluate",
+                    "config": {
+                        "model": "null",
+                        "params": {
+                            "model": {
+                                "value": "gpt-4o"
                             },
-                            "mappings": "mappings"
+                            "threshold": {
+                                "gte": 0.5
+                            }
                         },
-                        "displayName": "displayName"
+                        "mappings": "mappings"
                     },
-                    "rowFilterList": []
-                }
-            ]
-        }
+                    "displayName": "displayName"
+                },
+                "rowFilterList": []
+            }
     
-    def _get_metrics_schema_response(self):
+    def get_metrics_schema_response(self):
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
@@ -131,30 +125,55 @@ class Evaluation:
             pass
 
 
-    def _update_base_json(self, metrics):
-        base_json = self._get_metrics_base_schema()
-        base_json["metricParams"][0]["metricSpec"]["name"] = metrics[0]["name"]
-        if metrics[0]["config"]["model"]:
-            base_json["metricParams"][0]["metricSpec"]["config"]["params"]["model"]["value"] = metrics[0]["config"]["model"]
-        base_json["metricParams"][0]["metricSpec"]["displayName"] = self.column_name
-        base_json["datasetId"] = self.dataset_id
-        base_json["metricParams"][0]["metricSpec"]["config"]["mappings"] = self._get_mapping(metrics[0]["name"], self._get_metrics_schema_response())
-        return base_json
+    def update_base_json(self, metrics):
+        metric_schema_mapping = {"datasetId":self.dataset_id}
+        metrics_schema_response = self.get_metrics_schema_response()
+        metricParams = []
+        for metric in metrics:
+            base_json = self._get_metricParams()
+            base_json["metricSpec"]["name"] = metric["name"]
+            if metric["config"]["model"]:
+                base_json["metricSpec"]["config"]["params"]["model"]["value"] = metric["config"]["model"]
+            base_json["metricSpec"]["displayName"] = metric["column_name"]
+            mappings = self.get_mapping(metric["name"], metrics_schema_response)
+            base_json["metricSpec"]["config"]["mappings"] = mappings
+            metricParams.append(base_json)
+        metric_schema_mapping["metricParams"] = metricParams
+        return metric_schema_mapping
+
+    def _get_executed_metrics_list(self):
+        headers = {
+            "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+            'X-Project-Id': str(self.project_id),
+        }
+        response = requests.get(
+            f'{self.base_url}/v1/llm/filter?datasetId={str(self.dataset_id)}', 
+            headers=headers
+            )
+        
+        executed_metric_response = response.json()["data"]["filter"]
+        executed_metric_list = [item["displayName"] for item in executed_metric_response]
+        return executed_metric_list
 
 
     def add_metrics(self, metrics):
-        # pdb.set_trace()
+        executed_metric_list = self._get_executed_metrics_list()
+        column_names = [metric["column_name"] for metric in metrics]
+        for column_name in column_names:
+            if column_name in executed_metric_list:
+                raise ValueError(f"Column name '{column_name}' already exists.")
+
         headers = {
             'Content-Type': 'application/json',
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
         }
-        
+        metric_schema_mapping = self.update_base_json(metrics)
         try:
             response = requests.post(
                 f'{self.base_url}/playground/metric-evaluation', 
                 headers=headers, 
-                json=self._update_base_json(metrics)
+                json=metric_schema_mapping
                 )
             response.raise_for_status()
             if response.json()["success"]:
@@ -232,7 +251,10 @@ class Evaluation:
         response_text = parse_response()
         df = pd.read_csv(io.StringIO(response_text))
 
-        return df
+        column_list = df.columns.to_list()
+        column_list = [col for col in column_list if not col.startswith('_')]
+        column_list = [col for col in column_list if '.' not in col]
+        return df[column_list]
 
 
 
