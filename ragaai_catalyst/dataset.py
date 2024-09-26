@@ -33,14 +33,13 @@ class Dataset:
             )
             response.raise_for_status()
             logger.debug("Projects list retrieved successfully")
-
+            
             project_list = [
                 project["name"] for project in response.json()["data"]["content"]
             ]
 
             if project_name not in project_list:
-                raise ValueError(f"Project '{project_name}' not found. Please enter a valid project name.")
-                
+                raise ValueError("Project not found. Please enter a valid project name")
 
             self.project_id = [
                 project["id"] for project in response.json()["data"]["content"] if project["name"] == project_name
@@ -179,6 +178,10 @@ class Dataset:
             raise
 
     def create_from_csv(self, csv_path, dataset_name, schema_mapping):
+        list_dataset = self.list_datasets()
+        if dataset_name in list_dataset:
+            raise ValueError(f"Dataset name {dataset_name} already exists. Please enter a unique dataset name")
+
         #### get presigned URL
         def get_presignedUrl():
             headers = {
