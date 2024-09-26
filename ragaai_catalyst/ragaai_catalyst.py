@@ -201,29 +201,9 @@ class RagaAICatalyst:
             response.raise_for_status()  # Use raise_for_status to handle HTTP errors
             usecase = response.json()["data"]["usecase"]
             return usecase
-        except:
-            pass
-        # except requests.exceptions.HTTPError as http_err:
-        #     # Specific message for HTTP errors
-        #     logger.error(f"HTTP error occurred: {http_err}")
-        #     return f"HTTP error occurred: {http_err}"
-        # except requests.exceptions.ConnectionError as conn_err:
-        #     # Specific message for Connection errors
-        #     logger.error(f"Connection error occurred: {conn_err}")
-        #     return f"Connection error occurred: {conn_err}"
-        # except requests.exceptions.Timeout as timeout_err:
-        #     # Specific message for Timeout errors
-        #     logger.error(f"Timeout error occurred: {timeout_err}")
-        #     return f"Timeout error occurred: {timeout_err}"
-        # except requests.exceptions.RequestException as req_err:
-        #     # General request exception catch-all
-        #     logger.error(f"An error occurred: {req_err}")
-        #     return f"An error occurred: {req_err}"
-        # except Exception as e:
-        #     # General exception catch-all
-        #     logger.error(f"An unexpected error occurred: {e}")
-        #     return f"An unexpected error occurred: {e}"
-
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to retrieve project use cases: {e}")
+            return []
 
     def create_project(self, project_name, usecase="Q/A", type="llm"):
         """
@@ -442,3 +422,6 @@ class RagaAICatalyst:
             else:
                 logger.error("Failed to list metrics: %s", str(http_err))
                 return f"Failed to list metrics: {response.json().get('message', 'Unknown error')}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to list metrics: {e}")
+            return []
