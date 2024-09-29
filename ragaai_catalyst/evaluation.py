@@ -16,10 +16,11 @@ class Evaluation:
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 10
         self.jobId = None
+        self.num_projects=100
 
         try:
             response = requests.get(
-                f"{self.base_url}/v2/llm/projects",
+                f"{self.base_url}/v2/llm/projects?size={self.num_projects}",
                 headers={
                     "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
                 },
@@ -28,10 +29,21 @@ class Evaluation:
             response.raise_for_status()
             logger.debug("Projects list retrieved successfully")
 
+            project_list = [
+                project["name"] for project in response.json()["data"]["content"]
+            ]
+            if project_name not in project_list:
+                raise ValueError("Project not found. Please enter a valid project name")
+            
             self.project_id = [
                 project["id"] for project in response.json()["data"]["content"] if project["name"] == project_name
             ][0]
 
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to retrieve projects list: {e}")
+            raise
+
+        try:
 
             headers = {
                 'Content-Type': 'application/json',
@@ -48,20 +60,16 @@ class Evaluation:
             
             response.raise_for_status()
             datasets_content = response.json()["data"]["content"]
+            dataset_list = [dataset["name"] for dataset in datasets_content]
+
+            if dataset_name not in dataset_list:
+                raise ValueError("Dataset not found. Please enter a valid dataset name")
+                
             self.dataset_id = [dataset["id"] for dataset in datasets_content if dataset["name"]==dataset_name][0]
 
-        except requests.exceptions.HTTPError as http_err:
-            logger.error(f"HTTP error occurred: {http_err}")
-        except requests.exceptions.ConnectionError as conn_err:
-            logger.error(f"Connection error occurred: {conn_err}")
-        except requests.exceptions.Timeout as timeout_err:
-            logger.error(f"Timeout error occurred: {timeout_err}")
-        except requests.exceptions.RequestException as req_err:
-            logger.error(f"An error occurred: {req_err}")
-        except IndexError:
-            logger.error(f"Project '{project_name}' or dataset '{dataset_name}' not found.")
-        except Exception as e:
-            logger.error(f"An unexpected error occurred: {e}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to retrieve dataset list: {e}")
+            raise
 
     
     def list_metrics(self):
