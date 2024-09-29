@@ -253,6 +253,8 @@ class Dataset:
                     json=data,
                     timeout=Dataset.TIMEOUT,
                 )
+                if response.status_code==400:
+                    raise ValueError(response.json()["message"])
                 response.raise_for_status()
                 return response.json()
             except requests.exceptions.RequestException as e:
