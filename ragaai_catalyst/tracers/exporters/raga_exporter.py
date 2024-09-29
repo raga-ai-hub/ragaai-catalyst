@@ -7,6 +7,7 @@ from tqdm import tqdm
 import requests
 from ...ragaai_catalyst import RagaAICatalyst
 import shutil
+import pdb
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +28,22 @@ class RagaExporter:
         "log_source": "metadata",
         "vector_store": "pipeline",
     }
+    SCHEMA_MAPPING_NEW = {
+        "trace_id": {"columnType": "traceId"},
+        "trace_uri": {"columnType": "traceUri"},
+        "prompt": {"columnType": "prompt"},
+        "response":{"columnType": "response"},
+        "context": {"columnType": "context"},
+        "llm_model": {"columnType":"pipeline"},
+        "recorded_on": {"columnType": "metadata"},
+        "embed_model": {"columnType":"pipeline"},
+        "log_source": {"columnType": "metadata"},
+        "vector_store":{"columnType":"pipeline"},
+        "feedback": {"columnType":"feedBack"}
+    }
     TIMEOUT = 10
 
-    def __init__(self, project_name):
+    def __init__(self, project_name, dataset_name):
         """
         Initializes a new instance of the RagaExporter class.
 
@@ -41,6 +55,7 @@ class RagaExporter:
             Exception: If the schema check fails or the schema creation fails.
         """
         self.project_name = project_name
+        self.dataset_name = dataset_name
         RagaExporter.BASE_URL = (
             os.getenv("RAGAAI_CATALYST_BASE_URL")
             if os.getenv("RAGAAI_CATALYST_BASE_URL")
@@ -55,15 +70,17 @@ class RagaExporter:
             )
         if not os.getenv("RAGAAI_CATALYST_TOKEN"):
             get_token()
-        status_code = self._check_schema()
-        if status_code == 404:
-            create_status_code = self._create_schema()
-            if create_status_code != 200:
-                raise Exception(
-                    "Failed to create schema. Please consider raising an issue."
-                )
-        elif status_code != 200:
-            raise Exception("Failed to check schema. Please consider raising an issue.")
+        # status_code = self._check_schema()
+        # print("status_code",status_code)
+        # if status_code == 404:
+        create_status_code = self._create_schema()
+        print('create_status_code',create_status_code)
+        if create_status_code != 200:
+            raise Exception(
+                "Failed to create schema. Please consider raising an issue."
+            )
+        # elif status_code != 200:
+        #     raise Exception("Failed to check schema. Please consider raising an issue.")
 
     def _check_schema(self):
         """
@@ -95,6 +112,8 @@ class RagaExporter:
     
 
         def compare_schemas(base_schema, project_schema):
+            print(base_schema,'/n')
+            print('project_schema', project_schema,'/n')
             differences = []
             for key, base_value in base_schema.items():
                 if key not in project_schema:
@@ -117,12 +136,13 @@ class RagaExporter:
         if response.status_code != 200:
             return response.status_code
         if response.status_code == 200:
-            project_schema = response.json()["data"]
-            base_schema = RagaExporter.SCHEMA_MAPPING
-            is_same, _ = compare_schemas(base_schema, project_schema)
-            if not is_same:
-                raise Exception(f"Trace cannot be logged to this Project because of schema difference. Create a new project to log trace")
-            return response.status_code
+            pass
+            # project_schema = response.json()["data"]
+            # base_schema = RagaExporter.SCHEMA_MAPPING
+            # is_same, _ = compare_schemas(base_schema, project_schema)
+            # if not is_same:
+            #     raise Exception(f"Trace cannot be logged to this Project because of schema difference. Create a new project to log trace")
+            # return response.status_code
         return response.status_code
 
     def _create_schema(self):
@@ -152,19 +172,22 @@ class RagaExporter:
                 "X-Project-Name": self.project_name,
             }
             json_data = {
-                "projectName": self.project_name,
-                "schemaMapping": RagaExporter.SCHEMA_MAPPING,
+                "datasetName": self.dataset_name,
+                "schemaMapping": RagaExporter.SCHEMA_MAPPING_NEW,
                 "traceFolderUrl": None,
             }
             response = requests.post(
-                f"{RagaExporter.BASE_URL}/v1/llm/master-dataset",
+                f"{RagaExporter.BASE_URL}/v1/llm/dataset/logs",
                 headers=headers,
                 json=json_data,
                 timeout=RagaExporter.TIMEOUT,
             )
+
             return response
 
         response = make_request()
+        print(response.json())
+        # print('make_request:', response)
         if response.status_code == 401:
             get_token()  # Fetch a new token and set it in the environment
             response = make_request()  # Retry the request
@@ -178,6 +201,7 @@ class RagaExporter:
         return status_code
 
     async def get_presigned_url(self, session, num_files):
+        # pdb.set_trace()
         """
         Asynchronously retrieves a presigned URL from the RagaExporter API.
 
@@ -194,8 +218,10 @@ class RagaExporter:
         """
 
         async def make_request():
+            # pdb.set_trace()
+
             json_data = {
-                "projectName": self.project_name,
+                "datasetName": self.dataset_name,
                 "numFiles": num_files,
             }
             headers = {
@@ -212,8 +238,9 @@ class RagaExporter:
 
                 # print(json_response)
                 json_data = await response.json()
-                return response, json_data
+                print('get_presigned_url',json_data)
 
+                return response, json_data
         response, json_data = await make_request()
         await self.response_checker_async(response, "RagaExporter.get_presigned_url")
         if response.status == 401:
@@ -250,8 +277,8 @@ class RagaExporter:
             }
 
             json_data = {
-                "projectName": self.project_name,
-                "traceUri": trace_uri,
+                "datasetName": self.dataset_name,
+                "presignedUrl": trace_uri,
             }
 
             async with session.post(
@@ -276,6 +303,9 @@ class RagaExporter:
         return response.status
 
     async def upload_file(self, session, url, file_path):
+        # pdb.set_trace()
+        # print('url', url)
+        print("inside upload_file raga_exporter")
         """
         Asynchronously uploads a file using the given session, url, and file path.
         Supports both regular and Azure blob storage URLs.
@@ -295,9 +325,8 @@ class RagaExporter:
                 "Content-Type": "application/json",
             }
 
-            if "blob.core.windows.net" in url:  # Azure
-                headers["x-ms-blob-type"] = "BlockBlob"
-
+            # if "blob.core.windows.net" in url:  # Azure
+            #     headers["x-ms-blob-type"] = "BlockBlob"
             print(f"Uploading traces...")
             logger.debug(f"Uploading file:{file_path} with url {url}")
 
@@ -308,6 +337,7 @@ class RagaExporter:
                     url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
             ) as response:
                 status = response.status
+                print("put", response, status)
                 return response, status
 
         response, status = await make_request()
@@ -324,6 +354,8 @@ class RagaExporter:
         return response.status
 
     async def check_and_upload_files(self, session, file_paths):
+        # print(file_paths)
+        # pdb.set_trace()
         """
         Checks if there are files to upload, gets presigned URLs, uploads files, and streams them if successful.
 
@@ -388,6 +420,7 @@ class RagaExporter:
 
         # If URLs were successfully obtained, start the upload process
         if presigned_urls != []:
+            print('presigned_urls',presigned_urls)
             for file_path, presigned_url in tqdm(
                 zip(file_paths, presigned_urls), desc="Uploading traces"
             ):
