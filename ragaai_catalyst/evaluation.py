@@ -88,14 +88,59 @@ class Evaluation:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def get_mapping(self, metric_name, metrics_schema):
+    def _get_dataset_schema(self):
+        headers = {
+            "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+            'Content-Type': 'application/json',
+            'X-Project-Id': str(self.project_id),
+        }
+        data = {
+            "datasetId": str(self.dataset_id),
+            "fields": [],
+            "rowFilterList": []
+        }
+        try:
+            response = requests.post(
+                f'{self.base_url}/v1/llm/docs', 
+                headers=headers,
+                json=data)
+            response.raise_for_status()
+            if response.status_code == 200:
+                return response.json()["data"]["columns"]
+        except requests.exceptions.HTTPError as http_err:
+            logger.error(f"HTTP error occurred: {http_err}")
+        except requests.exceptions.ConnectionError as conn_err:
+            logger.error(f"Connection error occurred: {conn_err}")
+        except requests.exceptions.Timeout as timeout_err:
+            logger.error(f"Timeout error occurred: {timeout_err}")
+        except requests.exceptions.RequestException as req_err:
+            logger.error(f"An error occurred: {req_err}")
+        except Exception as e:
+            logger.error(f"An unexpected error occurred: {e}")
+        return {}
+
+    def _get_variablename_from_dataset_schema(self, schemaName, metric_name):
+        dataset_schema = self._get_dataset_schema()
+        variableName = None
+        for column in dataset_schema:
+            columnName = column["columnName"].split('_')[0]
+            displayName = column["displayName"]
+            if columnName==schemaName.lower():
+                variableName = displayName
+        if variableName:
+            return variableName
+        else:
+            raise ValueError(f"'{schemaName.lower()}' column is required for {metric_name} metric evaluation, but not found in dataset")
+
+
+    def _get_mapping(self, metric_name, metrics_schema):
         mapping = []
         for schema in metrics_schema:
             if schema["name"]==metric_name:
                 requiredFields = schema["config"]["requiredFields"]
                 for field in requiredFields:
                     schemaName = field["name"]
-                    variableName = schemaName
+                    variableName = self._get_variablename_from_dataset_schema(schemaName, metric_name)
                     mapping.append({"schemaName": schemaName, "variableName": variableName})
         return mapping
 
@@ -120,7 +165,7 @@ class Evaluation:
                 "rowFilterList": []
             }
     
-    def get_metrics_schema_response(self):
+    def _get_metrics_schema_response(self):
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
@@ -144,9 +189,9 @@ class Evaluation:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def update_base_json(self, metrics):
+    def _update_base_json(self, metrics):
         metric_schema_mapping = {"datasetId":self.dataset_id}
-        metrics_schema_response = self.get_metrics_schema_response()
+        metrics_schema_response = self._get_metrics_schema_response()
         metricParams = []
         for metric in metrics:
             base_json = self._get_metricParams()
@@ -154,7 +199,7 @@ class Evaluation:
             if metric["config"]["model"]:
                 base_json["metricSpec"]["config"]["params"]["model"]["value"] = metric["config"]["model"]
             base_json["metricSpec"]["displayName"] = metric["column_name"]
-            mappings = self.get_mapping(metric["name"], metrics_schema_response)
+            mappings = self._get_mapping(metric["name"], metrics_schema_response)
             base_json["metricSpec"]["config"]["mappings"] = mappings
             metricParams.append(base_json)
         metric_schema_mapping["metricParams"] = metricParams
@@ -198,13 +243,16 @@ class Evaluation:
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
         }
-        metric_schema_mapping = self.update_base_json(metrics)
+        metric_schema_mapping = self._update_base_json(metrics)
+        print(metric_schema_mapping)
         try:
             response = requests.post(
                 f'{self.base_url}/playground/metric-evaluation', 
                 headers=headers, 
                 json=metric_schema_mapping
                 )
+            if response.status_code == 400:
+                raise ValueError(response.json()["message"])
             response.raise_for_status()
             if response.json()["success"]:
                 print(response.json()["message"])
