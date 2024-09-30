@@ -28,13 +28,12 @@ dependencies = [
     "opentelemetry-instrumentation-asgi==0.48b0",
     "opentelemetry-semantic-conventions==0.48b0",
     "opentelemetry-util-http==0.48b0",
-    "opentelemetry-instrumentation-langchain~=0.31.3",
-    "opentelemetry-instrumentation-openai~=0.31.3",
+    "opentelemetry-instrumentation-langchain~=0.30",
+    "opentelemetry-instrumentation-openai~=0.30",
     "langchain-core~=0.3.6",
     "langchain~=0.3.1",
     "openai>=1.35.10",
     "pandas>=2.1.1",
-    "tenacity==8.5.0",
 ]
 
 [project.optional-dependencies]
