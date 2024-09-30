@@ -70,11 +70,8 @@ class RagaExporter:
             )
         if not os.getenv("RAGAAI_CATALYST_TOKEN"):
             get_token()
-        # status_code = self._check_schema()
-        # print("status_code",status_code)
-        # if status_code == 404:
+
         create_status_code = self._create_schema()
-        print('create_status_code',create_status_code)
         if create_status_code != 200:
             raise Exception(
                 "Failed to create schema. Please consider raising an issue."
@@ -112,8 +109,7 @@ class RagaExporter:
     
 
         def compare_schemas(base_schema, project_schema):
-            print(base_schema,'/n')
-            print('project_schema', project_schema,'/n')
+
             differences = []
             for key, base_value in base_schema.items():
                 if key not in project_schema:
@@ -186,8 +182,7 @@ class RagaExporter:
             return response
 
         response = make_request()
-        print(response.json())
-        # print('make_request:', response)
+
         if response.status_code == 401:
             get_token()  # Fetch a new token and set it in the environment
             response = make_request()  # Retry the request
@@ -236,9 +231,7 @@ class RagaExporter:
                 timeout=RagaExporter.TIMEOUT,
             ) as response:
 
-                # print(json_response)
                 json_data = await response.json()
-                print('get_presigned_url',json_data)
 
                 return response, json_data
         response, json_data = await make_request()
@@ -305,7 +298,6 @@ class RagaExporter:
     async def upload_file(self, session, url, file_path):
         # pdb.set_trace()
         # print('url', url)
-        print("inside upload_file raga_exporter")
         """
         Asynchronously uploads a file using the given session, url, and file path.
         Supports both regular and Azure blob storage URLs.
@@ -337,7 +329,6 @@ class RagaExporter:
                     url, headers=headers, data=data, timeout=RagaExporter.TIMEOUT
             ) as response:
                 status = response.status
-                print("put", response, status)
                 return response, status
 
         response, status = await make_request()
@@ -420,7 +411,6 @@ class RagaExporter:
 
         # If URLs were successfully obtained, start the upload process
         if presigned_urls != []:
-            print('presigned_urls',presigned_urls)
             for file_path, presigned_url in tqdm(
                 zip(file_paths, presigned_urls), desc="Uploading traces"
             ):
