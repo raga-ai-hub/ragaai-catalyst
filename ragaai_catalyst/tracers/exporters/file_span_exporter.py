@@ -86,6 +86,14 @@ class FileSpanExporter(SpanExporter):
             logger.debug(f"Writing jsonl file: {self.filename}")
             f.write(json.dumps(export_data) + "\n")
 
+        # Write export_data to a JSON file named tracer.json in the current working directory
+        tracer_json_path = os.path.join(os.getcwd(), "tracer.json")
+        with open(tracer_json_path, "w", encoding="utf-8") as tracer_file:
+            logger.debug(f"Writing json file: {tracer_json_path}")
+            json.dump(export_data, tracer_file, ensure_ascii=False, indent=4)
+        
+        
+
         if os.path.exists(json_file_path):
             with open(json_file_path, "r") as f:
                 data = json.load(f)
