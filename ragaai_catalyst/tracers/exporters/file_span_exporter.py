@@ -86,21 +86,6 @@ class FileSpanExporter(SpanExporter):
             logger.debug(f"Writing jsonl file: {self.filename}")
             f.write(json.dumps(export_data) + "\n")
 
-        # Write export_data to a JSON file named tracer.json in the current working directory
-        tracer_json_path = os.path.join(os.getcwd(), "tracer_debug.json")
-        # if os.path.exists(tracer_json_path):
-        #     with open(tracer_json_path, "r+", encoding="utf-8") as tracer_file:
-        #         logger.debug(f"Appending to json file: {tracer_json_path}")
-        #         data = json.load(tracer_file)
-        #         data.append(export_data)
-        #         tracer_file.seek(0)
-        #         json.dump(data, tracer_file, ensure_ascii=False, indent=4)
-        # else:
-        #     with open(tracer_json_path, "w", encoding="utf-8") as tracer_file:
-        #         logger.debug(f"Writing new json file: {tracer_json_path}")
-        #         json.dump([export_data], tracer_file, ensure_ascii=False, indent=4)
-        
-        
 
         if os.path.exists(json_file_path):
             with open(json_file_path, "r") as f:
@@ -108,15 +93,7 @@ class FileSpanExporter(SpanExporter):
                 data.append(export_data)
             with open(json_file_path, "w") as f:
                 logger.debug(f"Appending to json file: {json_file_path}")
-                json.dump(data, f)
-
-            with open(tracer_json_path, "r") as f:
-                data = json.load(f)
-                data.append(export_data)
-            with open(tracer_json_path, "w") as f:
-                logger.debug(f"Appending to json file: {json_file_path}")
-                json.dump(data, f)
-    
+                json.dump(data, f)    
     
         else:
             with open(json_file_path, "w") as f:
@@ -127,10 +104,6 @@ class FileSpanExporter(SpanExporter):
                     # self._upload_task = self._run_async(self._upload_traces(json_file_path= self.sync_file))
                     self._run_async(self._upload_traces(json_file_path=self.sync_file))
                 self.sync_file = json_file_path
-            with open(tracer_json_path, "w") as f:
-                logger.debug(f"Writing json  file: {json_file_path}")
-                json_data = [export_data]
-                json.dump(json_data, f)
         # asyncio.run(self.server_upload(json_file_path))
 
     def _run_async(self, coroutine):
