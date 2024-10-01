@@ -87,18 +87,18 @@ class FileSpanExporter(SpanExporter):
             f.write(json.dumps(export_data) + "\n")
 
         # Write export_data to a JSON file named tracer.json in the current working directory
-        tracer_json_path = os.path.join(os.getcwd(), "tracer.json")
-        if os.path.exists(tracer_json_path):
-            with open(tracer_json_path, "r+", encoding="utf-8") as tracer_file:
-                logger.debug(f"Appending to json file: {tracer_json_path}")
-                data = json.load(tracer_file)
-                data.append(export_data)
-                tracer_file.seek(0)
-                json.dump(data, tracer_file, ensure_ascii=False, indent=4)
-        else:
-            with open(tracer_json_path, "w", encoding="utf-8") as tracer_file:
-                logger.debug(f"Writing new json file: {tracer_json_path}")
-                json.dump([export_data], tracer_file, ensure_ascii=False, indent=4)
+        # tracer_json_path = os.path.join(os.getcwd(), "tracer.json")
+        # if os.path.exists(tracer_json_path):
+        #     with open(tracer_json_path, "r+", encoding="utf-8") as tracer_file:
+        #         logger.debug(f"Appending to json file: {tracer_json_path}")
+        #         data = json.load(tracer_file)
+        #         data.append(export_data)
+        #         tracer_file.seek(0)
+        #         json.dump(data, tracer_file, ensure_ascii=False, indent=4)
+        # else:
+        #     with open(tracer_json_path, "w", encoding="utf-8") as tracer_file:
+        #         logger.debug(f"Writing new json file: {tracer_json_path}")
+        #         json.dump([export_data], tracer_file, ensure_ascii=False, indent=4)
         
         
 
