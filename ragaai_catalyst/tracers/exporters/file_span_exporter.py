@@ -87,6 +87,7 @@ class FileSpanExporter(SpanExporter):
             f.write(json.dumps(export_data) + "\n")
 
 
+        tracer_json_file_path = os.path.join(os.getcwd(), "tracer_debug.json")
         if os.path.exists(json_file_path):
             with open(json_file_path, "r") as f:
                 data = json.load(f)
@@ -94,9 +95,18 @@ class FileSpanExporter(SpanExporter):
             with open(json_file_path, "w") as f:
                 logger.debug(f"Appending to json file: {json_file_path}")
                 json.dump(data, f)    
-    
+            with open(tracer_json_file_path, "r") as f:
+                data = json.load(f)
+                data.append(export_data)
+            with open(tracer_json_file_path, "w") as f:
+                logger.debug(f"Appending to json file: {json_file_path}")
+                json.dump(data, f)   
         else:
             with open(json_file_path, "w") as f:
+                logger.debug(f"Writing json  file: {json_file_path}")
+                json_data = [export_data]
+                json.dump(json_data, f)
+            with open(tracer_json_file_path, "w") as f:
                 logger.debug(f"Writing json  file: {json_file_path}")
                 json_data = [export_data]
                 json.dump(json_data, f)
