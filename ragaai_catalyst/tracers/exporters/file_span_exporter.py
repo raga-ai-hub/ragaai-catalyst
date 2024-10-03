@@ -87,6 +87,7 @@ class FileSpanExporter(SpanExporter):
             f.write(json.dumps(export_data) + "\n")
 
 
+        tracer_json_file_path = os.path.join(os.getcwd(), "tracer_debug.json")
         if os.path.exists(json_file_path):
             with open(json_file_path, "r") as f:
                 data = json.load(f)
@@ -94,7 +95,6 @@ class FileSpanExporter(SpanExporter):
             with open(json_file_path, "w") as f:
                 logger.debug(f"Appending to json file: {json_file_path}")
                 json.dump(data, f)    
-    
         else:
             with open(json_file_path, "w") as f:
                 logger.debug(f"Writing json  file: {json_file_path}")
@@ -104,7 +104,8 @@ class FileSpanExporter(SpanExporter):
                     # self._upload_task = self._run_async(self._upload_traces(json_file_path= self.sync_file))
                     self._run_async(self._upload_traces(json_file_path=self.sync_file))
                 self.sync_file = json_file_path
-        # asyncio.run(self.server_upload(json_file_path))
+        # asyncio.run(self.server_upload(json_file_path)
+
 
     def _run_async(self, coroutine):
         """Run an asynchronous coroutine in a separate thread."""
