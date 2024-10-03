@@ -249,6 +249,11 @@ class Evaluation:
 
     def add_metrics(self, metrics):
         executed_metric_list = self._get_executed_metrics_list()
+        metrics_name = self.list_metrics()
+        user_metric_names = [metric["name"] for metric in metrics]
+        for user_metric in user_metric_names:
+            if user_metric not in metrics_name:
+                raise ValueError("Enter a valid metric name")
         column_names = [metric["column_name"] for metric in metrics]
         for column_name in column_names:
             if column_name in executed_metric_list:
