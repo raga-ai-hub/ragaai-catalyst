@@ -160,10 +160,7 @@ class Evaluation:
                         "model": "null",
                         "params": {
                             "model": {
-                                "value": "gpt-4o"
-                            },
-                            "threshold": {
-                                "gte": 0.5
+                                "value": "gpt-4o-mini"
                             }
                         },
                         "mappings": "mappings"
@@ -200,12 +197,23 @@ class Evaluation:
     def _update_base_json(self, metrics):
         metric_schema_mapping = {"datasetId":self.dataset_id}
         metrics_schema_response = self._get_metrics_schema_response()
+        sub_providers = ["openai","azure","gemini","groq"]
         metricParams = []
         for metric in metrics:
             base_json = self._get_metricParams()
             base_json["metricSpec"]["name"] = metric["name"]
-            if metric["config"]["model"]:
-                base_json["metricSpec"]["config"]["params"]["model"]["value"] = metric["config"]["model"]
+            
+            #pasing model configuration
+            for key, value in metric["config"].items():
+                #checking if provider is one of the allowed providers
+                if key.lower()=="provider" and value.lower() not in sub_providers:
+                    raise ValueError("Enter a valid provider name. The following Provider names are supported: OpenAI, Azure, Gemini, Groq")
+                
+                base_json["metricSpec"]["config"]["params"][key] = {"value": value}
+
+
+            # if metric["config"]["model"]:
+            #     base_json["metricSpec"]["config"]["params"]["model"]["value"] = metric["config"]["model"]
             base_json["metricSpec"]["displayName"] = metric["column_name"]
             mappings = self._get_mapping(metric["name"], metrics_schema_response)
             base_json["metricSpec"]["config"]["mappings"] = mappings
