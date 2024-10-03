@@ -5,7 +5,7 @@ from typing import Union
 import logging
 from .ragaai_catalyst import RagaAICatalyst
 import pandas as pd
-
+import pdb
 logger = logging.getLogger(__name__)
 get_token = RagaAICatalyst.get_token
 
@@ -213,6 +213,7 @@ class Dataset:
 
         #### put csv to presigned URL
         def put_csv_to_presignedUrl(url):
+            # pdb.set_trace()
             headers = {
                 'Content-Type': 'text/csv',
                 'x-ms-blob-type': 'BlockBlob',
@@ -232,8 +233,11 @@ class Dataset:
                 raise
 
         try:
+
             put_csv_response = put_csv_to_presignedUrl(url)
-            if put_csv_response.status_code != 200:
+            pdb.set_trace()
+            print(put_csv_response)
+            if put_csv_response.status_code not in (200, 201):
                 raise ValueError('Unable to put csv to the presignedUrl')
         except Exception as e:
             logger.error(f"Error in put_csv_to_presignedUrl: {e}")
