@@ -317,8 +317,8 @@ class RagaExporter:
                 "Content-Type": "application/json",
             }
 
-            # if "blob.core.windows.net" in url:  # Azure
-            #     headers["x-ms-blob-type"] = "BlockBlob"
+            if "blob.core.windows.net" in url:  # Azure
+                headers["x-ms-blob-type"] = "BlockBlob"
             print(f"Uploading traces...")
             logger.debug(f"Uploading file:{file_path} with url {url}")
 
