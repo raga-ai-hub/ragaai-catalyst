@@ -156,7 +156,6 @@ class Evaluation:
             if "".join(val.split("_")).lower()==schemaName:
                 if key in user_dataset_columns:
                     variableName=key
-                    print(variableName)
                 else:
                     raise ValueError(f"Column '{key}' is not present in {self.dataset_name}")
         if variableName:
@@ -175,7 +174,6 @@ class Evaluation:
                     schemaName = field["name"]
                     # variableName = self._get_variablename_from_dataset_schema(schemaName, metric_name)
                     variableName = self._get_variablename_from_user_schema_mapping(schemaName.lower(), metric_name, schema_mapping)
-                    # print({"schemaName": schemaName, "variableName": variableName})
                     mapping.append({"schemaName": schemaName, "variableName": variableName})
         return mapping
 
@@ -299,7 +297,6 @@ class Evaluation:
             'X-Project-Id': str(self.project_id),
         }
         metric_schema_mapping = self._update_base_json(metrics)
-        # print(metric_schema_mapping)
         try:
             response = requests.post(
                 f'{self.base_url}/playground/metric-evaluation', 
