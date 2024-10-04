@@ -147,7 +147,25 @@ class Evaluation:
         #     raise ValueError(f"'{schemaName}' column is required for {metric_name} metric evaluation, but not found in dataset")
 
 
-    def _get_mapping(self, metric_name, metrics_schema):
+    def _get_variablename_from_user_schema_mapping(self, schemaName, metric_name, schema_mapping):
+        # pdb.set_trace()
+        user_dataset_schema = self._get_dataset_schema()
+        user_dataset_columns = [item["displayName"] for item in user_dataset_schema]
+        variableName = None
+        for key, val in schema_mapping.items():
+            if "".join(val.split("_")).lower()==schemaName:
+                if key in user_dataset_columns:
+                    variableName=key
+                    print(variableName)
+                else:
+                    raise ValueError(f"Column '{key}' is not present in {self.dataset_name}")
+        if variableName:
+            return variableName
+        else:
+            raise ValueError(f"Column '{schemaName}' is required for {metric_name} metric evaluation")
+
+
+    def _get_mapping(self, metric_name, metrics_schema, schema_mapping):
         
         mapping = []
         for schema in metrics_schema:
@@ -155,7 +173,8 @@ class Evaluation:
                 requiredFields = schema["config"]["requiredFields"]
                 for field in requiredFields:
                     schemaName = field["name"]
-                    variableName = self._get_variablename_from_dataset_schema(schemaName, metric_name)
+                    # variableName = self._get_variablename_from_dataset_schema(schemaName, metric_name)
+                    variableName = self._get_variablename_from_user_schema_mapping(schemaName.lower(), metric_name, schema_mapping)
                     # print({"schemaName": schemaName, "variableName": variableName})
                     mapping.append({"schemaName": schemaName, "variableName": variableName})
         return mapping
@@ -223,7 +242,7 @@ class Evaluation:
             # if metric["config"]["model"]:
             #     base_json["metricSpec"]["config"]["params"]["model"]["value"] = metric["config"]["model"]
             base_json["metricSpec"]["displayName"] = metric["column_name"]
-            mappings = self._get_mapping(metric["name"], metrics_schema_response)
+            mappings = self._get_mapping(metric["name"], metrics_schema_response, metric["schema_mapping"])
             base_json["metricSpec"]["config"]["mappings"] = mappings
             metricParams.append(base_json)
         metric_schema_mapping["metricParams"] = metricParams
@@ -256,6 +275,13 @@ class Evaluation:
             return []
 
     def add_metrics(self, metrics):
+        #Handle required key if missing
+        required_keys = {"name", "config", "column_name", "schema_mapping"}
+        for metric in metrics:
+            missing_keys = required_keys - metric.keys()
+            if missing_keys:
+                raise ValueError(f"{missing_keys} required for each metric evaluation.")
+
         executed_metric_list = self._get_executed_metrics_list()
         metrics_name = self.list_metrics()
         user_metric_names = [metric["name"] for metric in metrics]
