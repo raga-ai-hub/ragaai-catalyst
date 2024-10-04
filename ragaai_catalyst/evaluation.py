@@ -128,20 +128,27 @@ class Evaluation:
         return {}
 
     def _get_variablename_from_dataset_schema(self, schemaName, metric_name):
+        # pdb.set_trace()
+        # print(schemaName)
         dataset_schema = self._get_dataset_schema()
         variableName = None
         for column in dataset_schema:
-            columnName = column["columnName"].split('_')[0]
+            columnName = column["columnType"]
             displayName = column["displayName"]
-            if columnName==schemaName.lower():
+            # print(columnName, displayName)
+            if "".join(columnName.split("_")).lower() == schemaName.lower():
                 variableName = displayName
-        if variableName:
-            return variableName
-        else:
-            raise ValueError(f"'{schemaName.lower()}' column is required for {metric_name} metric evaluation, but not found in dataset")
+                break
+        return variableName
+        # print(variableName)
+        # if variableName:
+        #     return variableName
+        # else:
+        #     raise ValueError(f"'{schemaName}' column is required for {metric_name} metric evaluation, but not found in dataset")
 
 
     def _get_mapping(self, metric_name, metrics_schema):
+        
         mapping = []
         for schema in metrics_schema:
             if schema["name"]==metric_name:
@@ -149,6 +156,7 @@ class Evaluation:
                 for field in requiredFields:
                     schemaName = field["name"]
                     variableName = self._get_variablename_from_dataset_schema(schemaName, metric_name)
+                    # print({"schemaName": schemaName, "variableName": variableName})
                     mapping.append({"schemaName": schemaName, "variableName": variableName})
         return mapping
 
@@ -265,7 +273,7 @@ class Evaluation:
             'X-Project-Id': str(self.project_id),
         }
         metric_schema_mapping = self._update_base_json(metrics)
-        print(metric_schema_mapping)
+        # print(metric_schema_mapping)
         try:
             response = requests.post(
                 f'{self.base_url}/playground/metric-evaluation', 
