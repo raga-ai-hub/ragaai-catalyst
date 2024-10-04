@@ -185,7 +185,7 @@ class Evaluation:
                         "model": "null",
                         "params": {
                             "model": {
-                                "value": "gpt-4o-mini"
+                                "value": ""
                             }
                         },
                         "mappings": "mappings"
