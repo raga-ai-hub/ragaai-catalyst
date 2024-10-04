@@ -42,8 +42,6 @@ class SyntheticDataGeneration:
         model = model_config.get("model")
         api_base = model_config.get("api_base")
 
-
-
         system_message = self._get_system_message(question_type, n)
         if provider == "groq":
             if api_key is None and os.getenv("GROQ_API_KEY") is None:
@@ -314,7 +312,7 @@ class SyntheticDataGeneration:
         Returns:
             list: A list of supported AI providers.
         """
-        return ['groq', 'gemini', 'openai']
+        return ['gemini', 'openai']
 
 # Usage:
 # from synthetic_data_generation import SyntheticDataGeneration
