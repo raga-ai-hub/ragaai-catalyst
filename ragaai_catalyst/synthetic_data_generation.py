@@ -2,7 +2,6 @@ import os
 from groq import Groq
 import google.generativeai as genai
 import openai
-import dotenv
 import PyPDF2
 import csv
 import markdown
