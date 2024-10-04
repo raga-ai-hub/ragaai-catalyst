@@ -21,10 +21,6 @@ class SyntheticDataGeneration:
         """
         Initialize the SyntheticDataGeneration class with API clients for Groq, Gemini, and OpenAI.
         """
-        # self.groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        # genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-        # openai.api_key = os.getenv("OPENAI_API_KEY")
-
     def generate_qna(self, text, question_type="simple", n=5,model_config=dict(),api_key=None):
         """
         Generate questions based on the given text using the specified model and provider.
@@ -72,7 +68,7 @@ class SyntheticDataGeneration:
             if api_key is None and os.getenv("OPENAI_API_KEY") is None:
                 raise ValueError("API key must be provided for OpenAI.")
             openai.api_key = api_key or os.getenv("OPENAI_API_KEY")
-            return self._generate_openai(text, system_message, model)
+            return self._generate_openai(text, system_message, model,api_key=api_key)
         else:
             raise ValueError("Invalid provider. Choose 'groq', 'gemini', or 'openai'.")
 
@@ -156,11 +152,11 @@ class SyntheticDataGeneration:
         response = model.generate_content([system_message, text])
         return self._parse_response(response, provider="gemini")
 
-    def _generate_openai(self, text, system_message, model):
+    def _generate_openai(self, text, system_message, model,api_key=None):
         """
         Generate questions using the OpenAI API.
 
-        Args:
+        Args:+
             text (str): The input text to generate questions from.
             system_message (str): The system message for the AI model.
             model (str): The specific OpenAI model to use.
@@ -168,7 +164,7 @@ class SyntheticDataGeneration:
         Returns:
             pandas.DataFrame: A DataFrame containing the generated questions and answers.
         """
-        client = openai.OpenAI()
+        client = openai.OpenAI(api_key=api_key)
         response = client.chat.completions.create(
             model=model,
             messages=[
