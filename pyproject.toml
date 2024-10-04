@@ -34,6 +34,9 @@ dependencies = [
     "langchain>=0.3.1",
     "openai>=1.51.0",
     "pandas>=2.1.1",
+    "groq>=0.11.0",
+    "PyPDF2>=3.0.1",
+    
 ]
 
 [project.optional-dependencies]

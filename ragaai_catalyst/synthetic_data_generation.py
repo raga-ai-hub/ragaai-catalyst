@@ -11,7 +11,7 @@ import json
 from ragaai_catalyst import proxy_call
 import ast
 
-dotenv.load_dotenv()
+# dotenv.load_dotenv()
 
 class SyntheticDataGeneration:
     """
