@@ -161,7 +161,7 @@ class Evaluation:
         if variableName:
             return variableName
         else:
-            raise ValueError(f"Column '{schemaName}' is required for {metric_name} metric evaluation")
+            raise ValueError(f"Map '{schemaName}' column in schema_mapping for {metric_name} metric evaluation")
 
 
     def _get_mapping(self, metric_name, metrics_schema, schema_mapping):
@@ -334,7 +334,13 @@ class Evaluation:
                 headers=headers, 
                 json=data)
             response.raise_for_status()
-            print(response.json()["data"]["status"])
+            status_json = response.json()["data"]["status"]
+            if status_json == "Failed":
+                return print("Job failed. No results to fetch.")
+            elif status_json == "In Progress":
+                return print(f"Job in progress. Please wait while the job completes.\nVisit Job Status: {self.base_url.removesuffix('/api')}/projects/job-status?projectId={self.project_id} to track")
+            elif status_json == "Completed":
+                print(f"Job completed. Fetching results.\nVisit Job Status: {self.base_url.removesuffix('/api')}/projects/job-status?projectId={self.project_id} to check")
         except requests.exceptions.HTTPError as http_err:
             logger.error(f"HTTP error occurred: {http_err}")
         except requests.exceptions.ConnectionError as conn_err:
