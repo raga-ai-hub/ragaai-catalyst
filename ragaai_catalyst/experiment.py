@@ -476,7 +476,7 @@ class Experiment:
 
             columns_list = x.columns.tolist()
             #remove trace_uri from columns_list if it exists
-            columns_list = columns_list - ["trace_uri"]
+            columns_list = list(set(columns_list) - {"trace_uri"})
             x = x[columns_list]
 
             return True, x

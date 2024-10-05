@@ -57,14 +57,15 @@ class RagaAICatalyst:
         if base_url:
             RagaAICatalyst.BASE_URL = base_url
             try:
+                self.get_token()
                 os.environ["RAGAAI_CATALYST_BASE_URL"] = base_url
             except requests.exceptions.RequestException:
                 raise ConnectionError(
                     "The provided base_url is not accessible. Please re-check the base_url."
                 )
-
-        # Get the token from the server
-        self.get_token()
+        else:
+            # Get the token from the server
+            self.get_token()
 
         # Set the API keys, if  available
         if self.api_keys:
@@ -187,7 +188,24 @@ class RagaAICatalyst:
             logger.error("Token(s) not set")
             return None
 
-    def create_project(self, project_name, type="llm", description=""):
+    def project_use_cases(self):
+        try:
+            headers = {
+            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+            }
+            response = requests.get(
+                f"{RagaAICatalyst.BASE_URL}/v2/llm/usecase",
+                headers=headers,
+                timeout=self.TIMEOUT
+            )
+            response.raise_for_status()  # Use raise_for_status to handle HTTP errors
+            usecase = response.json()["data"]["usecase"]
+            return usecase
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to retrieve project use cases: {e}")
+            return []
+
+    def create_project(self, project_name, usecase="Q/A", type="llm"):
         """
         Creates a project with the given project_name, type, and description.
 
@@ -199,23 +217,32 @@ class RagaAICatalyst:
         Returns:
             str: A message indicating the success or failure of the project creation.
         """
-        json_data = {"name": project_name, "type": type, "description": description}
+        # Check if the project already exists
+        existing_projects = self.list_projects()
+        if project_name in existing_projects:
+            raise ValueError(f"Project name '{project_name}' already exists. Please choose a different name.")
+
+        usecase_list = self.project_use_cases()
+        if usecase not in usecase_list:
+            raise ValueError(f"Select a valid usecase from {usecase_list}")
+        
+        json_data = {"name": project_name, "type": type, "usecase": usecase}
         headers = {
             "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
         }
         try:
             response = requests.post(
-                f"{RagaAICatalyst.BASE_URL}/projects",
+                f"{RagaAICatalyst.BASE_URL}/v2/llm/project",
                 headers=headers,
                 json=json_data,
                 timeout=self.TIMEOUT,
             )
             response.raise_for_status()
             print(
-                f"Project Created Successfully with name {response.json()['data']['name']}"
+                f"Project Created Successfully with name {response.json()['data']['name']} & usecase {usecase}"
             )
-            return f'Project Created Successfully with name {response.json()["data"]["name"]}'
+            return f'Project Created Successfully with name {response.json()["data"]["name"]} & usecase {usecase}'
 
         except requests.exceptions.HTTPError as http_err:
             if response.status_code == 401:
@@ -226,7 +253,7 @@ class RagaAICatalyst:
                 )
                 try:
                     response = requests.post(
-                        f"{RagaAICatalyst.BASE_URL}/projects",
+                        f"{RagaAICatalyst.BASE_URL}/v2/llm/project",
                         headers=headers,
                         json=json_data,
                         timeout=self.TIMEOUT,
@@ -257,6 +284,9 @@ class RagaAICatalyst:
             )
             return "An unexpected error occurred while creating the project"
 
+    def get_project_id(self, project_name):
+        pass
+
     def list_projects(self, num_projects=100):
         """
         Retrieves a list of projects with the specified number of projects.
@@ -267,25 +297,18 @@ class RagaAICatalyst:
         Returns:
             list: A list of project names retrieved successfully.
         """
-        params = {
-            "size": str(num_projects),
-            "page": "0",
-            "type": "llm",
-        }
         headers = {
-            "Content-Type": "application/json",
             "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
         }
         try:
             response = requests.get(
-                f"{RagaAICatalyst.BASE_URL}/projects",
-                params=params,
+                f"{RagaAICatalyst.BASE_URL}/v2/llm/projects?size={num_projects}",
                 headers=headers,
                 timeout=self.TIMEOUT,
             )
             response.raise_for_status()
             logger.debug("Projects list retrieved successfully")
-            # return [project["name"] for project in response.json()["data"]["content"]]
+
             project_list = [
                 project["name"] for project in response.json()["data"]["content"]
             ]
@@ -300,8 +323,7 @@ class RagaAICatalyst:
                 )
                 try:
                     response = requests.get(
-                        f"{RagaAICatalyst.BASE_URL}/projects",
-                        params=params,
+                        f"{RagaAICatalyst.BASE_URL}/v2/llm/projects",
                         headers=headers,
                         timeout=self.TIMEOUT,
                     )
@@ -400,3 +422,6 @@ class RagaAICatalyst:
             else:
                 logger.error("Failed to list metrics: %s", str(http_err))
                 return f"Failed to list metrics: {response.json().get('message', 'Unknown error')}"
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to list metrics: {e}")
+            return []

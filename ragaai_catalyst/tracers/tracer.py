@@ -25,9 +25,11 @@ logger = logging.getLogger(__name__)
 
 class Tracer:
     NUM_PROJECTS = 100
+    TIMEOUT = 10
     def __init__(
         self,
         project_name,
+        dataset_name,
         tracer_type=None,
         pipeline=None,
         metadata=None,
@@ -49,38 +51,43 @@ class Tracer:
             None
         """
         self.project_name = project_name
+        self.dataset_name = dataset_name
         self.tracer_type = tracer_type
         self.metadata = self._improve_metadata(metadata, tracer_type)
         self.pipeline = pipeline
         self.description = description
         self.upload_timeout = upload_timeout
+        self.base_url = f"{RagaAICatalyst.BASE_URL}"
+        self.timeout = 10
+        self.num_projects = 100
 
-        params = {
-            "size": str(self.NUM_PROJECTS),
-            "page": "0",
-            "type": "llm",
-        }
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
-        }
-        response = requests.get(
-            f"{RagaAICatalyst.BASE_URL}/projects",
-            params=params,
-            headers=headers,
-            timeout=10,
-        )
-        response.raise_for_status()
-        # logger.debug("Projects list retrieved successfully")
-        project_list = [
-            project["name"] for project in response.json()["data"]["content"]
-        ]
+        try:
+            response = requests.get(
+                f"{self.base_url}/v2/llm/projects?size={self.num_projects}",
+                headers={
+                    "Authorization": f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}',
+                },
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            logger.debug("Projects list retrieved successfully")
 
-        if self.project_name not in project_list:
-            raise ValueError("Project not found. Please enter a valid project name")
+            project_list = [
+                project["name"] for project in response.json()["data"]["content"]
+            ]
+            if project_name not in project_list:
+                raise ValueError("Project not found. Please enter a valid project name")
+            
+            self.project_id = [
+                project["id"] for project in response.json()["data"]["content"] if project["name"] == project_name
+            ][0]
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to retrieve projects list: {e}")
+            raise
 
 
-        self.raga_client = RagaExporter(project_name=self.project_name)
+        self.raga_client = RagaExporter(project_name=self.project_name, dataset_name=self.dataset_name)
 
         self._tracer_provider = self._setup_provider()
         self._instrumentor = self._setup_instrumentor(tracer_type)
