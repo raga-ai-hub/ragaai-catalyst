@@ -236,8 +236,15 @@ class Evaluation:
                 #checking if provider is one of the allowed providers
                 if key.lower()=="provider" and value.lower() not in sub_providers:
                     raise ValueError("Enter a valid provider name. The following Provider names are supported: OpenAI, Azure, Gemini, Groq")
-                
-                base_json["metricSpec"]["config"]["params"][key] = {"value": value}
+    
+                if key.lower()=="threshold":
+                    if len(value)>1:
+                        raise ValueError("'threshold' can only take one argument gte/lte/eq")
+                    else:
+                        for key_thres, value_thres in value.items():
+                            base_json["metricSpec"]["config"]["params"][key] = {f"{key_thres}":value_thres}
+                else:
+                    base_json["metricSpec"]["config"]["params"][key] = {"value": value}
 
 
             # if metric["config"]["model"]:
