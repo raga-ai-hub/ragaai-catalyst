@@ -80,7 +80,8 @@ class Evaluation:
         try:
             response = requests.get(
                 f'{self.base_url}/v1/llm/llm-metrics', 
-                headers=headers)
+                headers=headers,
+                timeout=self.timeout)
             response.raise_for_status()
             metric_names = [metric["name"] for metric in response.json()["data"]["metrics"]]
             return metric_names
@@ -111,7 +112,8 @@ class Evaluation:
             response = requests.post(
                 f'{self.base_url}/v1/llm/docs', 
                 headers=headers,
-                json=data)
+                json=data,
+                timeout=self.timeout)
             response.raise_for_status()
             if response.status_code == 200:
                 return response.json()["data"]["columns"]
@@ -203,7 +205,8 @@ class Evaluation:
         try:
             response = requests.get(
                 f'{self.base_url}/v1/llm/llm-metrics', 
-                headers=headers)
+                headers=headers,
+                timeout=self.timeout)
             response.raise_for_status()
             metrics_schema = [metric for metric in response.json()["data"]["metrics"]]
             return metrics_schema
@@ -233,8 +236,15 @@ class Evaluation:
                 #checking if provider is one of the allowed providers
                 if key.lower()=="provider" and value.lower() not in sub_providers:
                     raise ValueError("Enter a valid provider name. The following Provider names are supported: OpenAI, Azure, Gemini, Groq")
-                
-                base_json["metricSpec"]["config"]["params"][key] = {"value": value}
+    
+                if key.lower()=="threshold":
+                    if len(value)>1:
+                        raise ValueError("'threshold' can only take one argument gte/lte/eq")
+                    else:
+                        for key_thres, value_thres in value.items():
+                            base_json["metricSpec"]["config"]["params"][key] = {f"{key_thres}":value_thres}
+                else:
+                    base_json["metricSpec"]["config"]["params"][key] = {"value": value}
 
 
             # if metric["config"]["model"]:
@@ -253,12 +263,15 @@ class Evaluation:
         }
         try:
             response = requests.get(
-                f'{self.base_url}/v1/llm/filter?datasetId={str(self.dataset_id)}', 
-                headers=headers
-                )
+                f"{self.base_url}/v2/llm/dataset/{str(self.dataset_id)}?initialCols=0",
+                headers=headers,
+                timeout=self.timeout,
+            )
             response.raise_for_status()
-            executed_metric_response = response.json()["data"]["filter"]
-            executed_metric_list = [item["displayName"] for item in executed_metric_response]
+            dataset_columns = response.json()["data"]["datasetColumnsResponses"]
+            dataset_columns = [item["displayName"] for item in dataset_columns]
+            executed_metric_list = [data for data in dataset_columns if not data.startswith('_')]
+
             return executed_metric_list
         except requests.exceptions.HTTPError as http_err:
             logger.error(f"HTTP error occurred: {http_err}")
@@ -301,7 +314,8 @@ class Evaluation:
             response = requests.post(
                 f'{self.base_url}/playground/metric-evaluation', 
                 headers=headers, 
-                json=metric_schema_mapping
+                json=metric_schema_mapping,
+                timeout=self.timeout
                 )
             if response.status_code == 400:
                 raise ValueError(response.json()["message"])
@@ -327,14 +341,14 @@ class Evaluation:
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'X-Project-Id': str(self.project_id),
         }
-        data = {"jobId": self.jobId}
         try:
-            response = requests.post(
+            response = requests.get(
                 f'{self.base_url}/job/status', 
                 headers=headers, 
-                json=data)
+                timeout=self.timeout)
             response.raise_for_status()
-            status_json = response.json()["data"]["status"]
+            if response.json()["success"]:
+                status_json = [item["status"] for item in response.json()["data"]["content"] if item["id"]==self.jobId][0]
             if status_json == "Failed":
                 return print("Job failed. No results to fetch.")
             elif status_json == "In Progress":
@@ -373,7 +387,8 @@ class Evaluation:
                 response = requests.post(
                     f'{self.base_url}/v1/llm/docs', 
                     headers=headers, 
-                    json=data)
+                    json=data,
+                    timeout=self.timeout)
                 response.raise_for_status()
                 return response.json()
             except requests.exceptions.HTTPError as http_err:
@@ -392,7 +407,7 @@ class Evaluation:
             try:
                 response = get_presignedUrl()
                 preSignedURL = response["data"]["preSignedURL"]
-                response = requests.get(preSignedURL)
+                response = requests.get(preSignedURL, timeout=self.timeout)
                 response.raise_for_status()
                 return response.text
             except requests.exceptions.HTTPError as http_err:
