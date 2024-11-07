@@ -43,7 +43,7 @@ def get_username():
 
 def convert_input(messages, model_config, user_id):
     doc_input = {
-      "model": model_config.pop('model'),
+      "model": model_config.get('model'),
       **model_config,
       "messages": messages,
       "user_id": user_id

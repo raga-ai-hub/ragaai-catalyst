@@ -8,10 +8,10 @@ import markdown
 import pandas as pd
 import json
 from litellm import completion
-# import internal_api_completion
-from ragaai_catalyst import internal_api_completion
-from ragaai_catalyst import proxy_call
-# import proxy_call
+import internal_api_completion
+# from ragaai_catalyst import internal_api_completion
+# from ragaai_catalyst import proxy_call
+import proxy_call
 import ast
 
 # dotenv.load_dotenv()
@@ -25,6 +25,8 @@ class SyntheticDataGeneration:
         """
         Initialize the SyntheticDataGeneration class with API clients for Groq, Gemini, and OpenAI.
         """
+
+
     def generate_qna(self, text, question_type="simple", n=5,model_config=dict(),api_key=None,**kwargs):
         """
         Generate questions based on the given text using the specified model and provider.
@@ -76,14 +78,20 @@ class SyntheticDataGeneration:
             else:
                 raise ValueError("Invalid provider. Choose 'groq', 'gemini', or 'openai'.")
         else:
-            messages=[
-                {'role': 'user', 'content': system_message+text}]
-            response= internal_api_completion.api_completion(messages=messages,model_config =model_config, kwargs=kwargs)
-            json_data = json.loads(response.replace('\n', ''))
-            return pd.DataFrame(json_data)
-
-
-
+            attempts = 0
+            while attempts < 3:
+                messages=[
+                    {'role': 'user', 'content': system_message+text}]
+                response= internal_api_completion.api_completion(messages=messages,model_config =model_config, kwargs=kwargs)
+                response1 = response.replace('\n', '')
+                try:
+                    json_data = json.loads(response1)
+                    return pd.DataFrame(json_data)  # Successfully parsed JSON, return DataFrame
+                except json.JSONDecodeError:
+                    attempts += 1  # Increment attempts if JSON parsing fails
+                    if attempts == 3:
+                        raise Exception("Failed to generate a valid response after multiple attempts.")
+          
     def _get_system_message(self, question_type, n):
         """
         Get the appropriate system message for the specified question type.
@@ -149,6 +157,31 @@ class SyntheticDataGeneration:
         Raises:
             Exception: If there's an error in generating the response.
         """
+        def retry_generation(attempts=3):
+            """
+            Retry the generation process in case of JSON parsing failure.
+
+            Args:
+                attempts (int): Number of retry attempts.
+
+            Returns:
+                pandas.DataFrame: A DataFrame containing the generated questions and answers.
+            """
+            for attempt in range(attempts):
+                try:
+                    response = completion(**completion_params)
+                    content = response.choices[0].message.content
+                    list_start_index = content.find('[')
+                    if list_start_index != -1:
+                        content = content[list_start_index:]
+                    json_data = json.loads(content)
+                    return pd.DataFrame(json_data)
+                except json.JSONDecodeError:
+                    if attempt == attempts - 1:
+                        raise Exception("Failed to parse JSON after multiple attempts")
+                except Exception as e:
+                    raise Exception(f"Error during retry: {str(e)}")
+
         try:
             # Prepare the messages in the format expected by LiteLLM
             messages = [
@@ -192,8 +225,8 @@ class SyntheticDataGeneration:
                 json_data = json.loads(content)
                 return pd.DataFrame(json_data)
             except json.JSONDecodeError:
-                # If JSON parsing fails, return a DataFrame with the raw content
-                return pd.DataFrame({'content': [content]})
+                # If JSON parsing fails, retry the generation process
+                return retry_generation()
 
         except Exception as e:
             raise Exception(f"Error generating response with LiteLLM: {str(e)}")
