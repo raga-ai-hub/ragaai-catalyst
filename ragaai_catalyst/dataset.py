@@ -120,7 +120,7 @@ class Dataset:
 
     ###################### CSV Upload APIs ###################
 
-    def get_csv_schema(self, dataset_name):
+    def get_dataset_columns(self, dataset_name):
         list_dataset = self.list_datasets()
         if dataset_name not in list_dataset:
             raise ValueError(f"Dataset {dataset_name} does not exists. Please enter a valid dataset name")
