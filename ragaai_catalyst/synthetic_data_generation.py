@@ -8,10 +8,10 @@ import markdown
 import pandas as pd
 import json
 from litellm import completion
-# import internal_api_completion
-from ragaai_catalyst import internal_api_completion
-from ragaai_catalyst import proxy_call
-# import proxy_call
+import internal_api_completion
+# from ragaai_catalyst import internal_api_completion
+# from ragaai_catalyst import proxy_call
+import proxy_call
 import ast
 
 # dotenv.load_dotenv()
@@ -62,35 +62,82 @@ class SyntheticDataGeneration:
                     if api_key is None and os.getenv("GEMINI_API_KEY") is None:
                         raise ValueError("API key must be provided for Gemini.")
                     genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
-                    return self._generate_llm_response(text, system_message,model_config,api_key)
+
+                    attempts = 0
+                    while attempts < 3:
+                        messages=[
+                            {'role': 'user', 'content': system_message+text}]
+                        try:
+                            gemini_df = self._generate_llm_response(text, system_message,model_config,api_key)
+                            if len(gemini_df) >= n:
+                                return gemini_df.head(n)
+                            while len(gemini_df) < n:
+                                gemini_df2 = self._generate_gemini(text, system_message, model)
+                                gemini_df = pd.concat([gemini_df, gemini_df2], ignore_index=True)
+                            return gemini_df.head(n)
+                        except json.JSONDecodeError:
+                            attempts += 1  # Increment attempts if JSON parsing fails
+                            if attempts == 3:
+                                raise Exception("Failed to generate a valid response after multiple attempts.")
                 else:
-                    messages=[
-                    {'role': 'user', 'content': system_message+text}
-                ]
-                    a= proxy_call.api_completion(messages=messages,model= model,api_base=api_base)
-                    b= ast.literal_eval(a[0])
-                    return pd.DataFrame(b)
+                    attempts = 0
+                    while attempts < 3:
+                        messages=[
+                        {'role': 'user', 'content': system_message+text}]
+                        try:
+                            a= proxy_call.api_completion(messages=messages,model= model,api_base=api_base)
+                            b= ast.literal_eval(a[0])
+                            proxy_call_df=pd.DataFrame(b)
+                            if len(proxy_call_df)>=n:
+                                return proxy_call_df.head(n)
+                            while len(proxy_call_df)<n:
+                                proxy_call_json = proxy_call.api_completion(messages=messages,model= model,api_base=api_base)
+                                proxy_call_json =  ast.literal_eval(proxy_call_json[0])
+                                proxy_call_df2 = pd.DataFrame(proxy_call_json)
+                                proxy_call_df = pd.concat([proxy_call_df, proxy_call_df2], ignore_index=True)
+                            return proxy_call_df2.hean(n) 
+                        except json.JSONDecodeError:
+                            attempts += 1  # Increment attempts if JSON parsing fails
+                            if attempts == 3:
+                                raise Exception("Failed to generate a valid response after multiple attempts.")
+
             elif provider == "openai":
                 if api_key is None and os.getenv("OPENAI_API_KEY") is None:
                     raise ValueError("API key must be provided for OpenAI.")
                 openai.api_key = api_key or os.getenv("OPENAI_API_KEY")
-                return self._generate_llm_response(text, system_message,model_config,api_key)
+                attempts = 0
+                while attempts < 3:
+                    messages=[
+                        {'role': 'user', 'content': system_message+text}]
+                    try:
+                        openai_df = self._generate_llm_response(text, system_message,model_config,api_key)
+                        if len(openai_df) >= n:
+                            return openai_df.head(n)
+                        while len(openai_df) < n:
+                            openai_df2 = self._generate_openai(text, system_message, model,api_key=api_key)
+                            openai_df = pd.concat([openai_df, openai_df2], ignore_index=True)
+                        return openai_df.head(n)
+                    except:
+                        attempts += 1  # Increment attempts if JSON parsing fails
+                        if attempts == 3:
+                            raise Exception("Failed to generate a valid response after multiple attempts.")
             else:
                 raise ValueError("Invalid provider. Choose 'groq', 'gemini', or 'openai'.")
         else:
-            attempts = 0
-            while attempts < 3:
-                messages=[
-                    {'role': 'user', 'content': system_message+text}]
-                response= internal_api_completion.api_completion(messages=messages,model_config =model_config, kwargs=kwargs)
-                response1 = response.replace('\n', '')
-                try:
-                    json_data = json.loads(response1)
-                    return pd.DataFrame(json_data)  # Successfully parsed JSON, return DataFrame
-                except json.JSONDecodeError:
-                    attempts += 1  # Increment attempts if JSON parsing fails
-                    if attempts == 3:
-                        raise Exception("Failed to generate a valid response after multiple attempts.")
+            n = n 
+            messages=[
+                {'role': 'user', 'content': system_message+text}]
+            import pdb
+            pdb.set_trace()
+            internal_api_response= internal_api_completion.api_completion(messages=messages,model_config =model_config, kwargs=kwargs)
+            if len(internal_api_response) >= n:
+                return internal_api_response.head(n)
+            while len(internal_api_response) < n:
+                internal_api_response2 = internal_api_completion.api_completion(messages=messages,model_config =model_config, kwargs=kwargs)
+                internal_api_response = pd.concat([internal_api_response, internal_api_response2], ignore_index=True)
+            return internal_api_response.head(n)
+ 
+
           
     def _get_system_message(self, question_type, n):
         """
@@ -157,79 +204,46 @@ class SyntheticDataGeneration:
         Raises:
             Exception: If there's an error in generating the response.
         """
-        def retry_generation(attempts=3):
-            """
-            Retry the generation process in case of JSON parsing failure.
 
-            Args:
-                attempts (int): Number of retry attempts.
-
-            Returns:
-                pandas.DataFrame: A DataFrame containing the generated questions and answers.
-            """
-            for attempt in range(attempts):
-                try:
-                    response = completion(**completion_params)
-                    content = response.choices[0].message.content
-                    list_start_index = content.find('[')
-                    if list_start_index != -1:
-                        content = content[list_start_index:]
-                    json_data = json.loads(content)
-                    return pd.DataFrame(json_data)
-                except json.JSONDecodeError:
-                    if attempt == attempts - 1:
-                        raise Exception("Failed to parse JSON after multiple attempts")
-                except Exception as e:
-                    raise Exception(f"Error during retry: {str(e)}")
-
-        try:
             # Prepare the messages in the format expected by LiteLLM
-            messages = [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": text}
-            ]
+        messages = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": text}
+        ]
 
-            # Set up the completion parameters
-            completion_params = {
-                "model": model_config["model"],
-                "messages": messages,
-                "api_key": api_key
-            }
+        # Set up the completion parameters
+        completion_params = {
+            "model": model_config["model"],
+            "messages": messages,
+            "api_key": api_key
+        }
 
-            # Add optional parameters if they exist in model_config
-            if "api_base" in model_config:
-                completion_params["api_base"] = model_config["api_base"]
-            if "max_tokens" in model_config:
-                completion_params["max_tokens"] = model_config["max_tokens"]
-            if "temperature" in model_config:
-                completion_params["temperature"] = model_config["temperature"]
+        # Add optional parameters if they exist in model_config
+        if "api_base" in model_config:
+            completion_params["api_base"] = model_config["api_base"]
+        if "max_tokens" in model_config:
+            completion_params["max_tokens"] = model_config["max_tokens"]
+        if "temperature" in model_config:
+            completion_params["temperature"] = model_config["temperature"]
 
-            # Make the API call using LiteLLM
-            try:
-                response = completion(**completion_params)
-            except Exception as e:
-                if any(error in str(e).lower() for error in ["invalid api key", "incorrect api key", "unauthorized", "authentication"]):
-                    raise ValueError(f"Invalid API key provided for {model_config.get('provider', 'the specified')} provider")
-                raise Exception(f"Error calling LLM API: {str(e)}")
-
-            # Extract the content from the response
-            content = response.choices[0].message.content
-
-            # Clean the response if needed (remove any prefix before the JSON list)
-            list_start_index = content.find('[')
-            if list_start_index != -1:
-                content = content[list_start_index:]
-
-            try:
-                # Parse the JSON response
-                json_data = json.loads(content)
-                return pd.DataFrame(json_data)
-            except json.JSONDecodeError:
-                # If JSON parsing fails, retry the generation process
-                return retry_generation()
-
+        # Make the API call using LiteLLM
+        try:
+            response = completion(**completion_params)
         except Exception as e:
-            raise Exception(f"Error generating response with LiteLLM: {str(e)}")
+            if any(error in str(e).lower() for error in ["invalid api key", "incorrect api key", "unauthorized", "authentication"]):
+                raise ValueError(f"Invalid API key provided for {model_config.get('provider', 'the specified')} provider")
+            raise Exception(f"Error calling LLM API: {str(e)}")
+
+        # Extract the content from the response
+        content = response.choices[0].message.content
+
+        # Clean the response if needed (remove any prefix before the JSON list)
+        list_start_index = content.find('[')
+        if list_start_index != -1:
+            content = content[list_start_index:]
+
+        json_data = json.loads(content)
+        return pd.DataFrame(json_data)
 
     def _parse_response(self, response, provider):
         """
@@ -277,16 +291,19 @@ class SyntheticDataGeneration:
             if os.path.isfile(input_data):
                 # If input_data is a file path
                 _, file_extension = os.path.splitext(input_data)
-                if file_extension.lower() == '.pdf':
-                    return self._read_pdf(input_data)
-                elif file_extension.lower() == '.txt':
-                    return self._read_text(input_data)
-                elif file_extension.lower() == '.md':
-                    return self._read_markdown(input_data)
-                elif file_extension.lower() == '.csv':
-                    return self._read_csv(input_data)
-                else:
-                    raise ValueError(f"Unsupported file type: {file_extension}")
+                try:
+                    if file_extension.lower() == '.pdf':
+                        return self._read_pdf(input_data)
+                    elif file_extension.lower() == '.txt':
+                        return self._read_text(input_data)
+                    elif file_extension.lower() == '.md':
+                        return self._read_markdown(input_data)
+                    elif file_extension.lower() == '.csv':
+                        return self._read_csv(input_data)
+                    else:
+                        raise ValueError(f"Unsupported file type: {file_extension}")
+                except Exception:
+                    raise ValueError("Error reading the file. Upload a valid file.")
             else:
                 # If input_data is a string of text
                 return input_data
