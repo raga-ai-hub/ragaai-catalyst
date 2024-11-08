@@ -72,7 +72,7 @@ class SyntheticDataGeneration:
                             if len(gemini_df) >= n:
                                 return gemini_df.head(n)
                             while len(gemini_df) < n:
-                                gemini_df2 = self._generate_llm_response(text, system_message, model)
+                                gemini_df2 = self._generate_llm_response(text, system_message,model_config,api_key)
                                 gemini_df = pd.concat([gemini_df, gemini_df2], ignore_index=True)
                             return gemini_df.head(n)
                         except json.JSONDecodeError:
@@ -114,7 +114,7 @@ class SyntheticDataGeneration:
                         if len(openai_df) >= n:
                             return openai_df.head(n)
                         while len(openai_df) < n:
-                            openai_df2 = self._generate_llm_response(text, system_message, model,api_key=api_key)
+                            openai_df2 = self._generate_llm_response(text, system_message,model_config,api_key)
                             openai_df = pd.concat([openai_df, openai_df2], ignore_index=True)
                         return openai_df.head(n)
                     except:
