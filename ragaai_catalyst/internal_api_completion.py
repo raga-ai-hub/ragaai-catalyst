@@ -31,17 +31,20 @@ def api_completion(messages, model_config, kwargs):
                 raise ValueError(str(response.text))
             
             if response.status_code==200:
-                response = response.json()
-                result=  response["choices"][0]["message"]["content"]
-                response1 = result.replace('\n', '')
-                try:
-                    json_data = json.loads(response1)
-                    df = pd.DataFrame(json_data)
-                    return(df)
-                except json.JSONDecodeError:
-                    attempts += 1  # Increment attempts if JSON parsing fails
-                    if attempts == 3:
-                        raise Exception("Failed to generate a valid response after multiple attempts.")
+                response = response.json()                
+                if "error" in response:
+                    raise ValueError(response["error"]["message"])
+                else:
+                    result=  response["choices"][0]["message"]["content"]
+                    response1 = result.replace('\n', '')
+                    try:
+                        json_data = json.loads(response1)
+                        df = pd.DataFrame(json_data)
+                        return(df)
+                    except json.JSONDecodeError:
+                        attempts += 1  # Increment attempts if JSON parsing fails
+                        if attempts == 3:
+                            raise Exception("Failed to generate a valid response after multiple attempts.")
 
         except Exception as e:
             raise ValueError(f"{e}")
