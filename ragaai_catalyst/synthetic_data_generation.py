@@ -8,10 +8,10 @@ import markdown
 import pandas as pd
 import json
 from litellm import completion
-import internal_api_completion
-# from ragaai_catalyst import internal_api_completion
-# from ragaai_catalyst import proxy_call
-import proxy_call
+# import internal_api_completion
+from ragaai_catalyst import internal_api_completion
+from ragaai_catalyst import proxy_call
+# import proxy_call
 import ast
 
 # dotenv.load_dotenv()
