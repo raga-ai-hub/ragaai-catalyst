@@ -11,7 +11,6 @@ def api_completion(messages, model_config, kwargs):
     attempts = 0
     while attempts < 3:
 
-    # import pdb; pdb.set_trace()
         user_id = kwargs.get('user_id', '1')
         internal_llm_proxy = kwargs.get('internal_llm_proxy', -1)
             
@@ -24,7 +23,6 @@ def api_completion(messages, model_config, kwargs):
             # 'Wd-PCA-Feature-Key':f'your_feature_key, $(whoami)'
         }
         try:
-            # import pdb; pdb.set_trace()
             response = requests.request("POST", internal_llm_proxy, headers=headers, data=payload)
             if model_config.get('log_level','')=='debug':
                 logger.info(f'Model response Job ID {job_id} {response.text}')

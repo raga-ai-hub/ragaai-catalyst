@@ -127,8 +127,6 @@ class SyntheticDataGeneration:
             n = n 
             messages=[
                 {'role': 'user', 'content': system_message+text}]
-            import pdb
-            pdb.set_trace()
             internal_api_response= internal_api_completion.api_completion(messages=messages,model_config =model_config, kwargs=kwargs)
             if len(internal_api_response) >= n:
                 return internal_api_response.head(n)
