@@ -300,8 +300,8 @@ class SyntheticDataGeneration:
                         return self._read_csv(input_data)
                     else:
                         raise ValueError(f"Unsupported file type: {file_extension}")
-                except Exception:
-                    raise ValueError("Error reading the file. Upload a valid file.")
+                except Exception as e:
+                    raise ValueError(f"Error reading the file. Upload a valid file. \n{e}")
             else:
                 # If input_data is a string of text
                 return input_data
