@@ -9,6 +9,8 @@ import pandas as pd
 import json
 from litellm import completion
 from tqdm import tqdm
+# import internal_api_completion
+# import proxy_call
 from ragaai_catalyst import internal_api_completion
 from ragaai_catalyst import proxy_call
 import ast
@@ -78,7 +80,13 @@ class SyntheticDataGeneration:
                     
             except Exception as e:
                 print(f"Batch generation failed: {str(e)}")
-                break
+
+                if ("Invalid API key provided" in str(e)) or ("No connection adapters" in str(e)) or ("Required API Keys are not set" in str(e)): # handle invalid api key
+                    break
+
+
+                print("Retrying...")
+                continue
         
         # Convert to DataFrame and remove duplicates
         result_df = pd.DataFrame(all_responses)
@@ -105,7 +113,13 @@ class SyntheticDataGeneration:
                     
             except Exception as e:
                 print(f"Replenishment generation failed: {str(e)}")
-                break
+
+                if any(error in str(e) for error in ["Invalid API key provided", "No connection adapters", "Required API Keys are not set","litellm.BadRequestError"]):
+                    print("Stopping due to API key issues.")
+                    break
+
+                print("An unexpected error occurred. Retrying...")
+                continue
         
         pbar.close()
         
