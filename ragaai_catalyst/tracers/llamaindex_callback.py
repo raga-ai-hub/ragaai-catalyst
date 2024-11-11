@@ -216,7 +216,7 @@ class LlamaIndexTracer:
             response = requests.request("POST",
                 f"{self.base_url}/v1/llm/dataset/logs",
                 headers=headers,
-                json=payload,
+                data=payload,
                 timeout=self.timeout
             )
 
@@ -277,14 +277,15 @@ class LlamaIndexTracer:
                 "Content-Type": "application/json",
                 "X-Project-Name": self.project_name,
             }
-        payload = {
+        payload = json.dumps({
                 "datasetName": self.dataset_name,
                 "presignedUrl": presignedUrl,
-            }
+            })
         response = requests.request("POST", 
                                     f"{self.base_url}/v1/llm/insert/trace", 
                                     headers=headers, 
-                                    data=payload)
+                                    data=payload,
+                                    timeout=self.timeout)
         
 
     def _upload_traces(self, save_json_to_pwd=None):
