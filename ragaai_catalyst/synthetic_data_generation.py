@@ -8,10 +8,9 @@ import markdown
 import pandas as pd
 import json
 from litellm import completion
-# import internal_api_completion
+from tqdm import tqdm
 from ragaai_catalyst import internal_api_completion
 from ragaai_catalyst import proxy_call
-# import proxy_call
 import ast
 
 # dotenv.load_dotenv()
@@ -26,116 +25,138 @@ class SyntheticDataGeneration:
         Initialize the SyntheticDataGeneration class with API clients for Groq, Gemini, and OpenAI.
         """
 
-
-    def generate_qna(self, text, question_type="simple", n=5,model_config=dict(),api_key=None,**kwargs):
+    def generate_qna(self, text, question_type="simple", n=5, model_config=dict(), api_key=None, **kwargs):
         """
         Generate questions based on the given text using the specified model and provider.
+        Uses batch processing for larger values of n to maintain response quality.
 
         Args:
             text (str): The input text to generate questions from.
             question_type (str): The type of questions to generate ('simple', 'mcq', or 'complex').
-            model (str): The specific model to use for generation.
-            provider (str): The AI provider to use ('groq', 'gemini', or 'openai').
             n (int): The number of question/answer pairs to generate.
+            model_config (dict): Configuration for the model including provider and model name.
+            api_key (str, optional): The API key for the selected provider.
+            **kwargs: Additional keyword arguments.
 
         Returns:
-            pandas.DataFrame: A DataFrame containing the generated questions and answers.
+            pandas.DataFrame: A DataFrame containing exactly n generated questions and answers.
 
         Raises:
-            ValueError: If an invalid provider is specified.
+            ValueError: If an invalid provider is specified or API key is missing.
         """
+        BATCH_SIZE = 5  # Optimal batch size for maintaining response quality
         provider = model_config.get("provider")
         model = model_config.get("model")
-        # if "internal_llm_proxy" in kwargs.keys():
         api_base = model_config.get("api_base")
 
-        system_message = self._get_system_message(question_type, n)
-        if "internal_llm_proxy" not in kwargs.keys():
-            if provider == "groq":
-                if api_key is None and os.getenv("GROQ_API_KEY") is None:
-                    raise ValueError("API key must be provided for Groq.")
-                self.groq_client = Groq(api_key=api_key or os.getenv("GROQ_API_KEY"))
-                return self._generate_llm_response(text, system_message,model_config,api_key)
-            elif provider == "gemini":
-                genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
-                if api_base is None:
-                    if api_key is None and os.getenv("GEMINI_API_KEY") is None:
-                        raise ValueError("API key must be provided for Gemini.")
-                    genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
+        # Initialize the appropriate client based on provider
+        self._initialize_client(provider, api_key, api_base, internal_llm_proxy=kwargs.get("internal_llm_proxy", None))
 
-                    attempts = 0
-                    while attempts < 3:
-                        messages=[
-                            {'role': 'user', 'content': system_message+text}]
-                        try:
-                            gemini_df = self._generate_llm_response(text, system_message,model_config,api_key)
-                            if len(gemini_df) >= n:
-                                return gemini_df.head(n)
-                            while len(gemini_df) < n:
-                                gemini_df2 = self._generate_llm_response(text, system_message,model_config,api_key)
-                                gemini_df = pd.concat([gemini_df, gemini_df2], ignore_index=True)
-                            return gemini_df.head(n)
-                        except json.JSONDecodeError:
-                            attempts += 1  # Increment attempts if JSON parsing fails
-                            if attempts == 3:
-                                raise Exception("Failed to generate a valid response after multiple attempts.")
+        # Initialize progress bar
+        pbar = tqdm(total=n, desc="Generating QA pairs")
+        
+        # Initial generation phase
+        num_batches = (n + BATCH_SIZE - 1) // BATCH_SIZE
+        all_responses = []
+        
+        for _ in range(num_batches):
+            current_batch_size = min(BATCH_SIZE, n - len(all_responses))
+            if current_batch_size <= 0:
+                break
+                
+            try:
+                system_message = self._get_system_message(question_type, current_batch_size)
+                
+                if "internal_llm_proxy" in kwargs:
+                    batch_df = self._generate_internal_response(text, system_message, model_config, kwargs)
                 else:
-                    attempts = 0
-                    while attempts < 3:
-                        messages=[
-                        {'role': 'user', 'content': system_message+text}]
-                        try:
-                            a= proxy_call.api_completion(messages=messages,model= model,api_base=api_base)
-                            b= ast.literal_eval(a[0])
-                            proxy_call_df=pd.DataFrame(b)
-                            if len(proxy_call_df)>=n:
-                                return proxy_call_df.head(n)
-                            while len(proxy_call_df)<n:
-                                proxy_call_json = proxy_call.api_completion(messages=messages,model= model,api_base=api_base)
-                                proxy_call_json =  ast.literal_eval(proxy_call_json[0])
-                                proxy_call_df2 = pd.DataFrame(proxy_call_json)
-                                proxy_call_df = pd.concat([proxy_call_df, proxy_call_df2], ignore_index=True)
-                            return proxy_call_df2.hean(n) 
-                        except json.JSONDecodeError:
-                            attempts += 1  # Increment attempts if JSON parsing fails
-                            if attempts == 3:
-                                raise Exception("Failed to generate a valid response after multiple attempts.")
+                    batch_df = self._generate_batch_response(text, system_message, provider, model_config, api_key, api_base)
+                
+                if not batch_df.empty and len(batch_df) > 0:
+                    all_responses.extend(batch_df.to_dict('records'))
+                    pbar.update(len(batch_df))
+                    
+            except Exception as e:
+                print(f"Batch generation failed: {str(e)}")
+                break
+        
+        # Convert to DataFrame and remove duplicates
+        result_df = pd.DataFrame(all_responses)
+        result_df = result_df.drop_duplicates(subset=['Question'])
+        
+        # Replenish phase - generate additional questions if needed due to duplicates
+        while len(result_df) < n:
+            questions_needed = n - len(result_df)
+            try:
+                system_message = self._get_system_message(question_type, questions_needed)
+                
+                if "internal_llm_proxy" in kwargs:
+                    additional_df = self._generate_internal_response(text, system_message, model_config, kwargs)
+                else:
+                    additional_df = self._generate_batch_response(text, system_message, provider, model_config, api_key, api_base)
+                
+                if not additional_df.empty and len(additional_df) > 0:
+                    # Only add questions that aren't already in result_df
+                    new_questions = additional_df[~additional_df['Question'].isin(result_df['Question'])]
+                    if not new_questions.empty:
+                        result_df = pd.concat([result_df, new_questions], ignore_index=True)
+                        result_df = result_df.drop_duplicates(subset=['Question'])
+                        pbar.update(len(new_questions))
+                    
+            except Exception as e:
+                print(f"Replenishment generation failed: {str(e)}")
+                break
+        
+        pbar.close()
+        
+        # Ensure exactly n rows and reset index starting from 1
+        final_df = result_df.head(n)
+        final_df.index = range(1, len(final_df) + 1)
+        
+        return final_df
 
-            elif provider == "openai":
-                if api_key is None and os.getenv("OPENAI_API_KEY") is None:
-                    raise ValueError("API key must be provided for OpenAI.")
-                openai.api_key = api_key or os.getenv("OPENAI_API_KEY")
-                attempts = 0
-                while attempts < 3:
-                    messages=[
-                        {'role': 'user', 'content': system_message+text}]
-                    try:
-                        openai_df = self._generate_llm_response(text, system_message,model_config,api_key)
-                        if len(openai_df) >= n:
-                            return openai_df.head(n)
-                        while len(openai_df) < n:
-                            openai_df2 = self._generate_llm_response(text, system_message,model_config,api_key)
-                            openai_df = pd.concat([openai_df, openai_df2], ignore_index=True)
-                        return openai_df.head(n)
-                    except:
-                        attempts += 1  # Increment attempts if JSON parsing fails
-                        if attempts == 3:
-                            raise Exception("Failed to generate a valid response after multiple attempts.")
-            else:
-                raise ValueError("Invalid provider. Choose 'groq', 'gemini', or 'openai'.")
-        else:
-            n = n 
-            messages=[
-                {'role': 'user', 'content': system_message+text}]
-            internal_api_response= internal_api_completion.api_completion(messages=messages,model_config =model_config, kwargs=kwargs)
-            if len(internal_api_response) >= n:
-                return internal_api_response.head(n)
-            while len(internal_api_response) < n:
-                internal_api_response2 = internal_api_completion.api_completion(messages=messages,model_config =model_config, kwargs=kwargs)
-                internal_api_response = pd.concat([internal_api_response, internal_api_response2], ignore_index=True)
-            return internal_api_response.head(n)
- 
+    def _initialize_client(self, provider, api_key, api_base=None, internal_llm_proxy=None):
+        """Initialize the appropriate client based on provider."""
+        if provider == "groq":
+            if api_key is None and os.getenv("GROQ_API_KEY") is None:
+                raise ValueError("API key must be provided for Groq.")
+            self.groq_client = Groq(api_key=api_key or os.getenv("GROQ_API_KEY"))
+        
+        elif provider == "gemini":
+            if api_key is None and os.getenv("GEMINI_API_KEY") is None and api_base is None and internal_llm_proxy is None:
+                raise ValueError("API key must be provided for Gemini.")
+            genai.configure(api_key=api_key or os.getenv("GEMINI_API_KEY"))
+        
+        elif provider == "openai":
+            if api_key is None and os.getenv("OPENAI_API_KEY") is None and internal_llm_proxy is None:
+                raise ValueError("API key must be provided for OpenAI.")
+            openai.api_key = api_key or os.getenv("OPENAI_API_KEY")
 
+    def _generate_batch_response(self, text, system_message, provider, model_config, api_key, api_base):
+        """Generate a batch of responses using the specified provider."""
+        MAX_RETRIES = 3
+        
+        for attempt in range(MAX_RETRIES):
+            try:
+                if provider == "gemini" and api_base:
+                    messages = [{'role': 'user', 'content': system_message + text}]
+                    response = proxy_call.api_completion(messages=messages, model=model_config["model"], api_base=api_base)
+                    return pd.DataFrame(ast.literal_eval(response[0]))
+                else:
+                    return self._generate_llm_response(text, system_message, model_config, api_key)
+            except (json.JSONDecodeError, ValueError) as e:
+                if attempt == MAX_RETRIES - 1:
+                    raise Exception(f"Failed to generate valid response after {MAX_RETRIES} attempts: {str(e)}")
+                continue
+
+    def _generate_internal_response(self, text, system_message, model_config, kwargs):
+        """Generate response using internal API."""
+        messages = [{'role': 'user', 'content': system_message + text}]
+        return internal_api_completion.api_completion(
+            messages=messages,
+            model_config=model_config,
+            kwargs=kwargs
+        )
           
     def _get_system_message(self, question_type, n):
         """

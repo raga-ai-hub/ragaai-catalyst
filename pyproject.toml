@@ -40,6 +40,7 @@ dependencies = [
     "Markdown>=3.7",  
     "litellm==1.51.1",  
     "tenacity==8.3.0",
+    "tqdm>=4.66.5",
 ]
 
 [project.optional-dependencies]
