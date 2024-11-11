@@ -82,6 +82,8 @@ class LlamaIndexTracer:
 
         self.trace_handler = CustomTraceHandler()
         self.callback_manager.add_handler(self.trace_handler)
+        Settings.callback_manager = self.callback_manager
+
 
         # Monkey-patch LlamaIndex components
         self._monkey_patch()
@@ -206,11 +208,11 @@ class LlamaIndexTracer:
                 "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
                 "X-Project-Name": self.project_name,
             }
-            payload = {
+            payload = json.dumps({
                 "datasetName": self.dataset_name,
                 "schemaMapping": SCHEMA_MAPPING_NEW,
                 "traceFolderUrl": None,
-            }
+            })
             response = requests.request("POST",
                 f"{self.base_url}/v1/llm/dataset/logs",
                 headers=headers,
@@ -261,8 +263,8 @@ class LlamaIndexTracer:
             payload = f.read().replace("\n", "").replace("\r", "").encode()
 
 
-        response = requests.request("POST", 
-                                    f"{self.base_url}/v1/llm/insert/trace", 
+        response = requests.request("PUT", 
+                                    presignedUrl, 
                                     headers=headers, 
                                     data=payload,
                                     timeout=self.timeout)
@@ -294,12 +296,12 @@ class LlamaIndexTracer:
 
         if save_json_to_pwd:
             with open(filename, "w") as f:
-                json.dump(traces, f, indent=2, cls=CustomEncoder)
-
+                json.dump([traces], f, indent=2, cls=CustomEncoder)
+        print(f"tracer is saved to {filename}")
 
         self._create_dataset_schema_with_trace()
         presignedUrl = self._get_presigned_url()
         self._put_presigned_url(presignedUrl, filename)
         self._insert_traces(presignedUrl)
+        print("Traces uplaoded")
 
-        print(f"tracer is saved to {filename}")
