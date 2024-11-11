@@ -82,8 +82,7 @@ class SyntheticDataGeneration:
                 print(f"Batch generation failed: {str(e)}")
 
                 if ("Invalid API key provided" in str(e)) or ("No connection adapters" in str(e)) or ("Required API Keys are not set" in str(e)): # handle invalid api key
-                    break
-
+                    raise Exception(f"{e}")
 
                 print("Retrying...")
                 continue
@@ -115,8 +114,7 @@ class SyntheticDataGeneration:
                 print(f"Replenishment generation failed: {str(e)}")
 
                 if any(error in str(e) for error in ["Invalid API key provided", "No connection adapters", "Required API Keys are not set","litellm.BadRequestError"]):
-                    print("Stopping due to API key issues.")
-                    break
+                    raise Exception(f"{e}")
 
                 print("An unexpected error occurred. Retrying...")
                 continue
