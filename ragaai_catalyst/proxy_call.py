@@ -23,7 +23,7 @@ def api_completion(model,messages, api_base='http://127.0.0.1:8000',
         if model_config.get('log_level','')=='debug':
             logger.info(f'Model response Job ID {job_id} {response.text}')
         if response.status_code!=200:
-            logger.error(f'Error in model response Job ID {job_id}:',str(response.text))
+            # logger.error(f'Error in model response Job ID {job_id}:',str(response.text))
             raise ValueError(str(response.text))
     except Exception as e:
         logger.error(f'Error in calling api Job ID {job_id}:',str(e))
