@@ -27,7 +27,7 @@ def api_completion(messages, model_config, kwargs):
             if model_config.get('log_level','')=='debug':
                 logger.info(f'Model response Job ID {job_id} {response.text}')
             if response.status_code!=200:
-                logger.error(f'Error in model response Job ID {job_id}:',str(response.text))
+                # logger.error(f'Error in model response Job ID {job_id}:',str(response.text))
                 raise ValueError(str(response.text))
             
             if response.status_code==200:
