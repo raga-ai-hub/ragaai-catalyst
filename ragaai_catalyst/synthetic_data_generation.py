@@ -79,13 +79,15 @@ class SyntheticDataGeneration:
                     pbar.update(len(batch_df))
                     
             except Exception as e:
-                print(f"Batch generation failed: {str(e)}")
+                print(f"Batch generation failed.")
 
-                if ("Invalid API key provided" in str(e)) or ("No connection adapters" in str(e)) or ("Required API Keys are not set" in str(e)): # handle invalid api key
+                if any(error in str(e) for error in ["Invalid API key provided", "No connection adapters", "Required API Keys are not set","litellm.BadRequestError"]):
                     raise Exception(f"{e}")
 
-                print("Retrying...")
-                continue
+                else:
+                    print("Retrying...")
+                    continue
+        
         
         # Convert to DataFrame and remove duplicates
         result_df = pd.DataFrame(all_responses)
@@ -111,13 +113,14 @@ class SyntheticDataGeneration:
                         pbar.update(len(new_questions))
                     
             except Exception as e:
-                print(f"Replenishment generation failed: {str(e)}")
+                print(f"Replenishment generation failed")
 
                 if any(error in str(e) for error in ["Invalid API key provided", "No connection adapters", "Required API Keys are not set","litellm.BadRequestError"]):
                     raise Exception(f"{e}")
-
-                print("An unexpected error occurred. Retrying...")
-                continue
+                
+                else:
+                    print("An unexpected error occurred. Retrying...")
+                    continue
         
         pbar.close()
         
@@ -169,6 +172,9 @@ class SyntheticDataGeneration:
             model_config=model_config,
             kwargs=kwargs
         )
+
+
+        
           
     def _get_system_message(self, question_type, n):
         """
