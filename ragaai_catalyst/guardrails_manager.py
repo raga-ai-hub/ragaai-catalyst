@@ -68,10 +68,11 @@ class GuardrailsManager:
                 'X-Project-Id': str(self.project_id)
                 }
         response = requests.request("GET", f"{self.base_url}/guardrail/deployment/{deployment_id}", headers=headers, data=payload, timeout=self.timeout)
-        deployment_id_name = response.json()["data"]["name"]
-        deployment_id_guardrails = response.json()["data"]["guardrailsResponse"]
-        guardrails_list_deployment_id = [{_["type"]:_["name"]} for _ in deployment_id_guardrails]
-        return {"deployment_name":deployment_id_name, "guardrails_list":guardrails_list_deployment_id}
+        if response.json()['success']:
+            return response.json()
+        else:
+            print('Error in retrieving deployment details:',response.json()['message'])
+            return None
 
 
     def list_guardrails(self):
@@ -132,11 +133,12 @@ class GuardrailsManager:
             print(response.json()["message"])
             deployment_ids = self.list_deployment_ids()
             self.deployment_id = [_["id"] for _ in deployment_ids if _["name"]==self.deployment_name][0]
+            return self.deployment_id
         else:
             print(response)
             
 
-    def add_guardrails(self, guardrails, guardrails_config={}):
+    def add_guardrails(self, deployment_id, guardrails, guardrails_config={}):
         """
         Add guardrails to the current deployment.
         
@@ -145,16 +147,21 @@ class GuardrailsManager:
         :raises ValueError: If a guardrail name or type is invalid.
         """
         # Checking if guardrails names given already exist or not
-        _, guardrails_type_name_exists = self.get_deployment(self.deployment_id)
+        self.deployment_id = deployment_id
+        deployment_details = self.get_deployment(self.deployment_id)
+        if not deployment_details:
+            return None
+        deployment_id_name = deployment_details["data"]["name"]
+        deployment_id_guardrails = deployment_details["data"]["guardrailsResponse"]
+        guardrails_type_name_exists = [{_['metricSpec']["name"]:_['metricSpec']["displayName"]} for _ in deployment_id_guardrails]
         guardrails_type_name_exists = [list(d.values())[0] for d in guardrails_type_name_exists]
         user_guardrails_name_list = [_["name"] for _ in guardrails]
         for g_name in user_guardrails_name_list:
             if g_name in guardrails_type_name_exists:
                 raise ValueError(f"Guardrail with '{g_name} already exists, choose a unique name'")
-
         # Checking if guardrails type is correct or not
         available_guardrails_list = self.list_guardrails()
-        user_guardrails_type_list = [_["type"] for _ in guardrails]
+        user_guardrails_type_list = [_["name"] for _ in guardrails]
         for g_type in user_guardrails_type_list:
             if g_type not in available_guardrails_list:
                 raise ValueError(f"Guardrail type '{g_type} does not exists, choose a correct type'")
@@ -209,13 +216,30 @@ class GuardrailsManager:
         :param guardrail: A dictionary containing the guardrail's attributes.
         :return: A dictionary representing the guardrail's data.
         """
+        if 'config' in guardrail:
+            if 'mappings' in guardrail.get('config'):
+                for mapping in guardrail.get('config',{}).get('mappings',{}):
+                    if mapping['schemaName'] not in ['Text','Prompt','Context','Response']:
+                        raise(ValueError('Invalid schemaName in guardrail mapping schema'))
+                    if mapping['variableName'] not in ['Instruction','Prompt','Context','Response']:
+                        raise(ValueError('Invalid variableName in guardrail mapping schema'))
+            if 'model' in guardrail.get('config'):
+                if guardrail.get('config',{}).get('model','') not in ['gpt-4o-mini','gpt-4o','gpt-4-turbo']:
+                    raise(ValueError('Invalid model name in guardrail model schema'))
+            if 'params' not in guardrail.get('config'):
+                guardrail['config']['params'] = {
+                    "isActive": {"value": False},
+                    "isHighRisk": {"value": False},
+                    "threshold": {"lt": 1}
+                }
+
+
         data = {
+            "displayName": guardrail["displayName"],
             "name": guardrail["name"],
-            "type": guardrail["type"],
-            "isHighRisk": guardrail.get("isHighRisk", False),
-            "isActive": guardrail.get("isActive", False),
-            "threshold": {}
+            "config": guardrail.get("config", {})
         }
+        '''
         if "lte" in guardrail["threshold"]:
             data["threshold"]["lte"] = guardrail["threshold"]["lte"]
         elif "gte" in guardrail["threshold"]:
@@ -223,7 +247,7 @@ class GuardrailsManager:
         elif "eq" in guardrail["threshold"]:
             data["threshold"]["eq"] = guardrail["threshold"]["eq"]
         else:
-            data["threshold"]["gte"] = 0.0
+            data["threshold"]["gte"] = 0.0'''
         return data
 
 
