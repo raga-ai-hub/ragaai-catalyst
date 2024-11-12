@@ -12,6 +12,7 @@ import json
 import uuid
 import os
 import requests
+import tempfile
 
 from ..ragaai_catalyst import RagaAICatalyst
 
@@ -119,14 +120,18 @@ class LlamaIndexTracer:
 
         traces = self._add_traces_in_data(query_traces)
 
-        with open(filename, "w") as f:
+        # Write the tracer json files to a temporary directory
+        temp_dir = tempfile.gettempdir()
+        temp_file_path = f"{temp_dir}/{filename}"
+
+        with open(temp_file_path, "w") as f:
             json.dump([traces], f, indent=2, cls=CustomEncoder)
-        print(f"Query traces saved to {filename}")
+        print(f"Query traces saved to {temp_file_path}")
 
         # Upload the traces
         self._create_dataset_schema_with_trace()
         presignedUrl = self._get_presigned_url()
-        self._put_presigned_url(presignedUrl, filename)
+        self._put_presigned_url(presignedUrl, temp_file_path)
         self._insert_traces(presignedUrl)
         print(f"Query {self.query_count} traces uploaded")
 
