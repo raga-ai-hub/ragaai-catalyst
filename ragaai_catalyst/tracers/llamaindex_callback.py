@@ -37,14 +37,19 @@ class LlamaIndexTracer:
         self.user_detail = user_detail["trace_user_detail"]
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 10
+        self.query_count = 0
 
     def start(self):
         """Start tracing - call this before your LlamaIndex operations"""
+        outer_self = self  # Capture outer self reference for inner class
 
         class CustomTraceHandler(LlamaDebugHandler):
             def __init__(self):
                 super().__init__()
                 self.traces: List[Dict[str, Any]] = []
+                self.current_query_traces: List[Dict[str, Any]] = []
+                self.in_query = False
+                self.query_event_id = None
 
             def on_event_start(
                 self,
@@ -62,6 +67,13 @@ class LlamaIndexTracer:
                     "event_id": event_id,
                     "parent_id": parent_id,
                 }
+                if event_type == "query":
+                    self.in_query = True
+                    self.query_event_id = event_id
+                    self.current_query_traces = []
+                
+                if self.in_query:
+                    self.current_query_traces.append(trace)
                 self.traces.append(trace)
 
             def on_event_end(
@@ -78,7 +90,16 @@ class LlamaIndexTracer:
                     "status": "completed",
                     "event_id": event_id,
                 }
+                if self.in_query:
+                    self.current_query_traces.append(trace)
                 self.traces.append(trace)
+                
+                # If this is the end of a query event, automatically save the traces
+                if event_type == "query" and event_id == self.query_event_id:
+                    self.in_query = False
+                    outer_self._save_current_query_traces(self.current_query_traces)
+                    self.current_query_traces = []
+                
 
         self.trace_handler = CustomTraceHandler()
         self.callback_manager.add_handler(self.trace_handler)
@@ -88,6 +109,27 @@ class LlamaIndexTracer:
         # Monkey-patch LlamaIndex components
         self._monkey_patch()
         return self  # Return self to allow method chaining
+
+
+    def _save_current_query_traces(self, query_traces):
+        """Save traces for the current query"""
+        self.query_count += 1
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"trace_query_{self.query_count}_{timestamp}.json"
+
+        traces = self._add_traces_in_data(query_traces)
+
+        with open(filename, "w") as f:
+            json.dump([traces], f, indent=2, cls=CustomEncoder)
+        print(f"Query traces saved to {filename}")
+
+        # Upload the traces
+        self._create_dataset_schema_with_trace()
+        presignedUrl = self._get_presigned_url()
+        self._put_presigned_url(presignedUrl, filename)
+        self._insert_traces(presignedUrl)
+        print(f"Query {self.query_count} traces uploaded")
+
 
     def _monkey_patch(self):
         """Monkey-patch LlamaIndex components to automatically include the callback manager"""
@@ -135,7 +177,7 @@ class LlamaIndexTracer:
 
     def stop(self):
         """Stop tracing and restore original methods"""
-        self._upload_traces(save_json_to_pwd=True)
+        # self._upload_traces(save_json_to_pwd=True)
         self.callback_manager.remove_handler(self.trace_handler)
         self._restore_original_inits()
 
@@ -179,12 +221,14 @@ class LlamaIndexTracer:
         user_detail["metadata"] = metadata
         return user_detail
     
-    def _add_traces_in_data(self):
+    def _add_traces_in_data(self, traces=None):
+        """Add traces to user detail"""
         user_detail = self._get_user_passed_detail()
-        if not self.trace_handler:
-            raise RuntimeError("No traces available. Did you call start()?")
-        else:
-            user_detail["traces"] = self.trace_handler.traces
+        if traces is None:
+            if not self.trace_handler:
+                raise RuntimeError("No traces available. Did you call start()?")
+            traces = self.trace_handler.traces
+        user_detail["traces"] = traces
         return user_detail
 
 
