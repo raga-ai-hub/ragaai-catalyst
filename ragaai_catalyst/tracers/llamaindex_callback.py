@@ -126,14 +126,14 @@ class LlamaIndexTracer:
 
         with open(temp_file_path, "w") as f:
             json.dump([traces], f, indent=2, cls=CustomEncoder)
-        print(f"Query traces saved to {temp_file_path}")
+        # print(f"Query traces saved to {temp_file_path}")
 
         # Upload the traces
         self._create_dataset_schema_with_trace()
         presignedUrl = self._get_presigned_url()
         self._put_presigned_url(presignedUrl, temp_file_path)
         self._insert_traces(presignedUrl)
-        print(f"Query {self.query_count} traces uploaded")
+        # print(f"Query {self.query_count} traces uploaded")
 
 
     def _monkey_patch(self):
@@ -183,6 +183,7 @@ class LlamaIndexTracer:
     def stop(self):
         """Stop tracing and restore original methods"""
         # self._upload_traces(save_json_to_pwd=True)
+        print("Traces uplaoded")
         self.callback_manager.remove_handler(self.trace_handler)
         self._restore_original_inits()
 
