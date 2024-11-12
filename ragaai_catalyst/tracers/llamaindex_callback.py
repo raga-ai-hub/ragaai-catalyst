@@ -39,6 +39,7 @@ class LlamaIndexTracer:
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 10
         self.query_count = 0
+        self._upload_task = None
 
     def start(self):
         """Start tracing - call this before your LlamaIndex operations"""
@@ -183,9 +184,10 @@ class LlamaIndexTracer:
     def stop(self):
         """Stop tracing and restore original methods"""
         # self._upload_traces(save_json_to_pwd=True)
-        print("Traces uplaoded")
         self.callback_manager.remove_handler(self.trace_handler)
         self._restore_original_inits()
+        print("Traces uplaoded")
+        self._upload_task = True
 
     def _restore_original_inits(self):
         """Restore the original __init__ methods of LlamaIndex components"""
@@ -356,3 +358,9 @@ class LlamaIndexTracer:
         self._insert_traces(presignedUrl)
         print("Traces uplaoded")
 
+    def get_upload_status(self):
+        """Check the status of the trace upload."""
+        if self._upload_task is None:
+            return "No upload task in progress."
+        if self._upload_task:
+            return "Upload completed"
