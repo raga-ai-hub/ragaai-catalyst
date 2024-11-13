@@ -141,6 +141,9 @@ class SyntheticDataGeneration:
 
     def _initialize_client(self, provider, api_key, api_base=None, internal_llm_proxy=None):
         """Initialize the appropriate client based on provider."""
+        if not provider:
+            raise ValueError("Model configuration must be provided with a valid provider and model.")
+
         if provider == "groq":
             if api_key is None and os.getenv("GROQ_API_KEY") is None:
                 raise ValueError("API key must be provided for Groq.")
@@ -155,6 +158,9 @@ class SyntheticDataGeneration:
             if api_key is None and os.getenv("OPENAI_API_KEY") is None and internal_llm_proxy is None:
                 raise ValueError("API key must be provided for OpenAI.")
             openai.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        
+        else:
+            raise ValueError(f"Provider is not recognized.")
 
     def _generate_batch_response(self, text, system_message, provider, model_config, api_key, api_base):
         """Generate a batch of responses using the specified provider."""
