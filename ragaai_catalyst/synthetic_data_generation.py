@@ -67,7 +67,8 @@ class SyntheticDataGeneration:
             "Invalid API key provided",
             "No connection adapters", 
             "Required API Keys are not set",
-            "litellm.BadRequestError"]
+            "litellm.BadRequestError",
+            "litellm.AuthenticationError"]
         
         for _ in range(num_batches):
             current_batch_size = min(BATCH_SIZE, n - len(all_responses))
@@ -93,7 +94,7 @@ class SyntheticDataGeneration:
                     raise Exception(f"{e}")
 
                 else:
-                    print(f"Retrying...{e}")
+                    print(f"Retrying...")
                     continue
         
         
