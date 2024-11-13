@@ -67,16 +67,20 @@ class GuardExecutor:
         #deployment_response = self.execute_deployment(doc)
         
         # activate only guardrails that require response
-        response = self.llm_executor(messages,model_params,llm_caller)
-        doc['response'] = response['choices'][0].message.content
+        try:
+            llm_response = self.llm_executor(messages,model_params,llm_caller)
+        except Exception as e:
+            print('Error in running llm:',str(e))
+            return None
+        doc['response'] = llm_response['choices'][0].message.content
         if 'instruction' in self.field_map:
-            instruction = prompt_params['instruction']
+            instruction = prompt_params[self.field_map['instruction']]
         response = self.execute_deployment(doc)
         if response and response['data']['status'] == 'FAIL':
             print('Guardrail deployment run retured failed status, replacing with alternate response')
-            return response['data']['alternateResponse']
+            return response['data']['alternateResponse'],llm_response,response
         else:
-            return response
+            return None,llm_response,response
 
 
 
