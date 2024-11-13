@@ -11,8 +11,10 @@ from litellm import completion
 from tqdm import tqdm
 # import internal_api_completion
 # import proxy_call
-from ragaai_catalyst import internal_api_completion
-from ragaai_catalyst import proxy_call
+from .internal_api_completion import api_completion as internal_api_completion
+from .proxy_call import api_completion as proxy_api_completion
+# from ragaai_catalyst import internal_api_completion
+# from ragaai_catalyst import proxy_call
 import ast
 
 # dotenv.load_dotenv()
@@ -60,6 +62,13 @@ class SyntheticDataGeneration:
         # Initial generation phase
         num_batches = (n + BATCH_SIZE - 1) // BATCH_SIZE
         all_responses = []
+
+        FAILURE_CASES = [
+            "Invalid API key provided",
+            "No connection adapters", 
+            "Required API Keys are not set",
+            "litellm.BadRequestError",
+            "litellm.AuthenticationError"]
         
         for _ in range(num_batches):
             current_batch_size = min(BATCH_SIZE, n - len(all_responses))
@@ -81,11 +90,11 @@ class SyntheticDataGeneration:
             except Exception as e:
                 print(f"Batch generation failed.")
 
-                if any(error in str(e) for error in ["Invalid API key provided", "No connection adapters", "Required API Keys are not set","litellm.BadRequestError"]):
+                if any(error in str(e) for error in FAILURE_CASES):
                     raise Exception(f"{e}")
 
                 else:
-                    print("Retrying...")
+                    print(f"Retrying...")
                     continue
         
         
@@ -94,7 +103,7 @@ class SyntheticDataGeneration:
         result_df = result_df.drop_duplicates(subset=['Question'])
         
         # Replenish phase - generate additional questions if needed due to duplicates
-        while len(result_df) < n:
+        while (len(result_df) < n) and ((len(result_df) >= 1)):
             questions_needed = n - len(result_df)
             try:
                 system_message = self._get_system_message(question_type, questions_needed)
@@ -115,7 +124,7 @@ class SyntheticDataGeneration:
             except Exception as e:
                 print(f"Replenishment generation failed")
 
-                if any(error in str(e) for error in ["Invalid API key provided", "No connection adapters", "Required API Keys are not set","litellm.BadRequestError"]):
+                if any(error in str(e) for error in FAILURE_CASES):
                     raise Exception(f"{e}")
                 
                 else:
@@ -155,7 +164,8 @@ class SyntheticDataGeneration:
             try:
                 if provider == "gemini" and api_base:
                     messages = [{'role': 'user', 'content': system_message + text}]
-                    response = proxy_call.api_completion(messages=messages, model=model_config["model"], api_base=api_base)
+                    response = proxy_api_completion(messages=messages, model=model_config["model"], api_base=api_base)
+                    # response = proxy_call.api_completion(messages=messages, model=model_config["model"], api_base=api_base)
                     return pd.DataFrame(ast.literal_eval(response[0]))
                 else:
                     return self._generate_llm_response(text, system_message, model_config, api_key)
@@ -167,7 +177,7 @@ class SyntheticDataGeneration:
     def _generate_internal_response(self, text, system_message, model_config, kwargs):
         """Generate response using internal API."""
         messages = [{'role': 'user', 'content': system_message + text}]
-        return internal_api_completion.api_completion(
+        return internal_api_completion(
             messages=messages,
             model_config=model_config,
             kwargs=kwargs
