@@ -2,6 +2,9 @@ import litellm
 import json
 import requests
 import os
+import logging
+logger = logging.getLogger('LiteLLM')
+logger.setLevel(logging.ERROR)
 
 class GuardExecutor:
 
@@ -19,7 +22,6 @@ class GuardExecutor:
 
     def execute_deployment(self,payload):
         api = self.base_url + f'/guardrail/deployment/{self.deployment_id}/ingest'
-        print(api)
 
         payload = json.dumps(payload)
         headers = {
@@ -27,14 +29,13 @@ class GuardExecutor:
             'Content-Type': 'application/json',
             'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'
         }
-        print(payload)
         try:
             response = requests.request("POST", api, headers=headers, data=payload,timeout=self.guard_manager.timeout)
         except Exception as e:
-            print('Failed running guardrail',str(e))
+            print('Failed running guardrail: ',str(e))
             return None
         if response.status_code!=200:
-            print('Error in running deployment',response.json()['message'])
+            print('Error in running deployment ',response.json()['message'])
         if response.json()['success']:
             return response.json()
         else:
