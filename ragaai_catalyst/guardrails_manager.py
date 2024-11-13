@@ -177,6 +177,8 @@ class GuardrailsManager:
         response = requests.request("POST", f"{self.base_url}/guardrail/deployment/{str(self.deployment_id)}/configure", headers=headers, data=payload)
         if response.json()["success"]:
             print(response.json()["message"])
+        else:
+            print('Error updating guardrail ',response.json()['message'])
 
     def _get_guardrail_config_payload(self, guardrails_config):
         """
