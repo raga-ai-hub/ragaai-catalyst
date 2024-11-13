@@ -7,3 +7,4 @@ opentelemetry-instrumentation-langchain==0.24.0
 langchain-core==0.2.11
 opentelemetry-instrumentation-openai==0.24.0
 openai==1.35.10
+litellm==1.42.12
