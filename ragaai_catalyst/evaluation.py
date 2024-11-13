@@ -97,14 +97,45 @@ class Evaluation:
             logger.error(f"An unexpected error occurred: {e}")
             return []
 
-    def _get_dataset_schema(self):
+    def _get_dataset_id_based_on_dataset_type(self, metric_to_evaluate):
+        try:
+            headers = {
+                'Content-Type': 'application/json',
+                "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Id": str(self.project_id),
+            }
+            json_data = {"size": 12, "page": "0", "projectId": str(self.project_id), "search": ""}
+            response = requests.post(
+                f"{self.base_url}/v2/llm/dataset",
+                headers=headers,
+                json=json_data,
+                timeout=self.timeout,
+            )
+            
+            response.raise_for_status()
+            datasets_content = response.json()["data"]["content"]
+            dataset = [dataset for dataset in datasets_content if dataset["name"]==self.dataset_name][0]
+            if (dataset["datasetType"]=="prompt" and metric_to_evaluate=="prompt") or (dataset["datasetType"]=="chat" and metric_to_evaluate=="chat") or dataset["datasetType"]==None:
+                return dataset["id"]
+            else:
+                return dataset["derivedDatasetId"]
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to retrieve dataset list: {e}")
+            raise
+
+
+    def _get_dataset_schema(self, metric_to_evaluate=None):
+        #this dataset_id is based on which type of metric_to_evaluate  
+        data_set_id=self._get_dataset_id_based_on_dataset_type(metric_to_evaluate)
+        self.dataset_id=data_set_id
+
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             'Content-Type': 'application/json',
             'X-Project-Id': str(self.project_id),
         }
         data = {
-            "datasetId": str(self.dataset_id),
+            "datasetId": str(data_set_id),
             "fields": [],
             "rowFilterList": []
         }
@@ -129,29 +160,9 @@ class Evaluation:
             logger.error(f"An unexpected error occurred: {e}")
         return {}
 
-    def _get_variablename_from_dataset_schema(self, schemaName, metric_name):
-        # pdb.set_trace()
-        # print(schemaName)
-        dataset_schema = self._get_dataset_schema()
-        variableName = None
-        for column in dataset_schema:
-            columnName = column["columnType"]
-            displayName = column["displayName"]
-            # print(columnName, displayName)
-            if "".join(columnName.split("_")).lower() == schemaName.lower():
-                variableName = displayName
-                break
-        return variableName
-        # print(variableName)
-        # if variableName:
-        #     return variableName
-        # else:
-        #     raise ValueError(f"'{schemaName}' column is required for {metric_name} metric evaluation, but not found in dataset")
 
-
-    def _get_variablename_from_user_schema_mapping(self, schemaName, metric_name, schema_mapping):
-        # pdb.set_trace()
-        user_dataset_schema = self._get_dataset_schema()
+    def _get_variablename_from_user_schema_mapping(self, schemaName, metric_name, schema_mapping, metric_to_evaluate):
+        user_dataset_schema = self._get_dataset_schema(metric_to_evaluate)
         user_dataset_columns = [item["displayName"] for item in user_dataset_schema]
         variableName = None
         for key, val in schema_mapping.items():
@@ -159,7 +170,7 @@ class Evaluation:
                 if key in user_dataset_columns:
                     variableName=key
                 else:
-                    raise ValueError(f"Column '{key}' is not present in {self.dataset_name}")
+                    raise ValueError(f"Column '{key}' is not present in '{self.dataset_name}' dataset")
         if variableName:
             return variableName
         else:
@@ -172,10 +183,17 @@ class Evaluation:
         for schema in metrics_schema:
             if schema["name"]==metric_name:
                 requiredFields = schema["config"]["requiredFields"]
+
+                #this is added to check if "Chat" column is required for metric evaluation
+                required_variables = [_["name"].lower() for _ in requiredFields]
+                if "chat" in required_variables:
+                    metric_to_evaluate = "chat"
+                else:
+                    metric_to_evaluate = "prompt"
+
                 for field in requiredFields:
                     schemaName = field["name"]
-                    # variableName = self._get_variablename_from_dataset_schema(schemaName, metric_name)
-                    variableName = self._get_variablename_from_user_schema_mapping(schemaName.lower(), metric_name, schema_mapping)
+                    variableName = self._get_variablename_from_user_schema_mapping(schemaName.lower(), metric_name, schema_mapping, metric_to_evaluate)
                     mapping.append({"schemaName": schemaName, "variableName": variableName})
         return mapping
 
@@ -223,7 +241,6 @@ class Evaluation:
             return []
 
     def _update_base_json(self, metrics):
-        metric_schema_mapping = {"datasetId":self.dataset_id}
         metrics_schema_response = self._get_metrics_schema_response()
         sub_providers = ["openai","azure","gemini","groq"]
         metricParams = []
@@ -253,6 +270,7 @@ class Evaluation:
             mappings = self._get_mapping(metric["name"], metrics_schema_response, metric["schema_mapping"])
             base_json["metricSpec"]["config"]["mappings"] = mappings
             metricParams.append(base_json)
+        metric_schema_mapping = {"datasetId":self.dataset_id}
         metric_schema_mapping["metricParams"] = metricParams
         return metric_schema_mapping
 

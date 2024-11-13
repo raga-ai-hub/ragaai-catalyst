@@ -99,65 +99,6 @@ class Dataset:
             raise
 
     def get_schema_mapping(self):
-        return ["traceid", "prompt", "context", "response", "expected_response", "expected_context", "timestamp", "metadata", "pipeline", "cost", "feedBack", "latency", "sanitized_response", "system_prompt", "traceUri"]
-
-    def create_from_trace(self, dataset_name, filter_list):
-        """
-        Creates a new dataset with the given `dataset_name` and `filter_list`.
-
-        Args:
-            dataset_name (str): The name of the dataset to be created.
-            filter_list (list): A list of filters to be applied to the dataset.
-
-        Returns:
-            str: A message indicating the success of the dataset creation and the name of the created dataset.
-
-        Raises:
-            None
-
-        """
-
-        def request_trace_creation():
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
-                "X-Project-Name": self.project_name,
-            }
-            json_data = {
-                "projectName": self.project_name,
-                "subDatasetName": dataset_name,
-                "filterList": filter_list,
-            }
-            try:
-                response = requests.post(
-                    f"{Dataset.BASE_URL}/v1/llm/sub-dataset",
-                    headers=headers,
-                    json=json_data,
-                    timeout=Dataset.TIMEOUT,
-                )
-                response.raise_for_status()
-                return response
-            except requests.exceptions.RequestException as e:
-                logger.error(f"Failed to create dataset from trace: {e}")
-                raise
-
-        try:
-            response = request_trace_creation()
-            response_checker(response, "Dataset.create_dataset")
-            if response.status_code == 401:
-                get_token()  # Fetch a new token and set it in the environment
-                response = request_trace_creation()  # Retry the request
-            if response.status_code != 200:
-                return response.json()["message"]
-            message = response.json()["message"]
-            return f"{message} {dataset_name}"
-        except Exception as e:
-            logger.error(f"Error in create_from_trace: {e}")
-            raise
-
-    ###################### CSV Upload APIs ###################
-
-    def get_csv_schema(self):
         headers = {
             "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
             "X-Project-Name": self.project_name,
@@ -169,12 +110,60 @@ class Dataset:
                 timeout=Dataset.TIMEOUT,
             )
             response.raise_for_status()
-            response_data = response.json()
-            if not response_data['success']:
+            response_data = response.json()["data"]["schemaElements"]
+            if not response.json()['success']:
                 raise ValueError('Unable to fetch Schema Elements for the CSV')
             return response_data
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to get CSV schema: {e}")
+            raise
+
+    ###################### CSV Upload APIs ###################
+
+    def get_dataset_columns(self, dataset_name):
+        list_dataset = self.list_datasets()
+        if dataset_name not in list_dataset:
+            raise ValueError(f"Dataset {dataset_name} does not exists. Please enter a valid dataset name")
+
+        headers = {
+            "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+            "X-Project-Name": self.project_name,
+        }
+        headers = {
+                'Content-Type': 'application/json',
+                "Authorization": f"Bearer {os.getenv('RAGAAI_CATALYST_TOKEN')}",
+                "X-Project-Id": str(self.project_id),
+            }
+        json_data = {"size": 12, "page": "0", "projectId": str(self.project_id), "search": ""}
+        try:
+            response = requests.post(
+                f"{Dataset.BASE_URL}/v2/llm/dataset",
+                headers=headers,
+                json=json_data,
+                timeout=Dataset.TIMEOUT,
+            )
+            response.raise_for_status()
+            datasets = response.json()["data"]["content"]
+            dataset_id = [dataset["id"] for dataset in datasets if dataset["name"]==dataset_name][0]
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to list datasets: {e}")
+            raise
+
+        try:
+            response = requests.get(
+                f"{Dataset.BASE_URL}/v2/llm/dataset/{dataset_id}?initialCols=0",
+                headers=headers,
+                timeout=Dataset.TIMEOUT,
+            )
+            response.raise_for_status()
+            dataset_columns = response.json()["data"]["datasetColumnsResponses"]
+            dataset_columns = [item["displayName"] for item in dataset_columns]
+            dataset_columns = [data for data in dataset_columns if not data.startswith('_')]
+            if not response.json()['success']:
+                raise ValueError('Unable to fetch details of for the CSV')
+            return dataset_columns
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Failed to get CSV columns: {e}")
             raise
 
     def create_from_csv(self, csv_path, dataset_name, schema_mapping):
