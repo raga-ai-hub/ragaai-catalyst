@@ -10,10 +10,11 @@ RagaAI Catalyst is a powerful tool for managing and optimizing LLM projects. It 
   - [Configuration](#configuration)
   - [Usage](#usage)
     - [Project Management](#project-management)
-    - [Trace Management](#trace-management)
-    - [Experiment Management](#experiment-management)
     - [Dataset Management](#dataset-management)
+    - [Evaluation Management](#evaluation)
+    - [Trace Management](#trace-management)
     - [Prompt Management](#prompt-management)
+    - [Synthetic Data Generation](#synthetic-data-generation)
 
 ## Installation
 
@@ -49,13 +50,96 @@ Create and manage projects using RagaAI Catalyst:
 # Create a project
 project = catalyst.create_project(
     project_name="Test-RAG-App-1",
-    description="Description of the project"
+    usecase="Chatbot"
 )
+
+# Get project usecases
+catalyst.project_use_cases()
 
 # List projects
 projects = catalyst.list_projects()
 print(projects)
 ```
+
+### Dataset Management
+Manage datasets efficiently for your projects:
+
+```py
+from ragaai_catalyst import Dataset
+
+# Initialize Dataset management for a specific project
+dataset_manager = Dataset(project_name="project_name")
+
+# List existing datasets
+datasets = dataset_manager.list_datasets()
+print("Existing Datasets:", datasets)
+
+# Create a dataset from CSV
+dataset_manager.create_from_csv(
+    csv_path='path/to/your.csv',
+    dataset_name='MyDataset',
+    schema_mapping={'column1': 'schema_element1', 'column2': 'schema_element2'}
+)
+
+# Get project schema mapping
+dataset_manager.get_schema_mapping()
+
+```
+
+For more detailed information on Dataset Management, including CSV schema handling and advanced usage, please refer to the [Dataset Management documentation](docs/dataset_management.md).
+
+
+### Evaluation
+
+Create and manage metric evaluation of your RAG application:
+
+```python
+from ragaai_catalyst import Evaluation
+
+# Create an experiment
+evaluation = Evaluation(
+    project_name="Test-RAG-App-1",
+    dataset_name="MyDataset",
+)
+
+# Get list of available metrics
+evaluation.list_metrics()
+
+# Add metrics to the experiment
+schema_mapping={
+    'Query': 'prompt',
+    'response': 'response',
+    'Context': 'context',
+    'expectedResponse': 'expected_response'
+}
+
+# Add single metric
+evaluation.add_metrics(
+    metrics=[
+      {"name": "Faithfulness", "config": {"model": "gpt-4o-mini", "provider": "openai", "threshold": {"gte": 0.232323}}, "column_name": "Faithfulness_v1", "schema_mapping": schema_mapping},
+    
+    ]
+)
+
+# Add multiple metrics
+evaluation.add_metrics(
+    metrics=[
+        {"name": "Faithfulness", "config": {"model": "gpt-4o-mini", "provider": "openai", "threshold": {"gte": 0.323}}, "column_name": "Faithfulness_gte", "schema_mapping": schema_mapping},
+        {"name": "Hallucination", "config": {"model": "gpt-4o-mini", "provider": "openai", "threshold": {"lte": 0.323}}, "column_name": "Hallucination_lte", "schema_mapping": schema_mapping},
+        {"name": "Hallucination", "config": {"model": "gpt-4o-mini", "provider": "openai", "threshold": {"eq": 0.323}}, "column_name": "Hallucination_eq", "schema_mapping": schema_mapping},
+    ]
+)
+
+# Get the status of the experiment
+status = evaluation.get_status()
+print("Experiment Status:", status)
+
+# Get the results of the experiment
+results = evaluation.get_results()
+print("Experiment Results:", results)
+```
+
+
 
 ### Trace Management
 
@@ -67,6 +151,7 @@ from ragaai_catalyst import Tracer
 # Start a trace recording
 tracer = Tracer(
     project_name="Test-RAG-App-1",
+    dataset_name="tracer_dataset_name"
     metadata={"key1": "value1", "key2": "value2"},
     tracer_type="langchain",
     pipeline={
@@ -80,114 +165,93 @@ tracer = Tracer(
 
 # Stop the trace recording
 tracer.stop()
-
-# Alternatively, use a context manager
-with tracer.trace():
-    # Your code here
-```
-
-### Experiment Management
-
-Create and manage experiments to evaluate your RAG application:
-
-```python
-from ragaai_catalyst import Experiment
-
-# Create an experiment
-experiment_manager = Experiment(
-    project_name="Test-RAG-App-1",
-    experiment_name="Exp-01",
-    experiment_description="Experiment Description",
-    dataset_name="Dataset Created from UI",
-)
-
-# Add metrics to the experiment
-experiment_manager.add_metrics(
-    metrics=[
-      {"name": "hallucination", "config": {"model": "gpt-4o", "provider":"OpenAI"}}
-    ]
-)
-
-# Add multiple metrics
-experiment_manager.add_metrics(
-    metrics=[
-        {"name": "hallucination", "config": {"model": "gpt-4o", "provider":"OpenAI"}},
-        {"name": "hallucination", "config": {"model": "gpt-4", "provider":"OpenAI"}},
-        {"name": "hallucination", "config": {"model": "gpt-3.5-turbo", "provider":"OpenAI"}}
-    ]
-)
-
-# Get the status of the experiment
-status = experiment_manager.get_status()
-print("Experiment Status:", status)
-
-# Get the results of the experiment
-results = experiment_manager.get_results()
-print("Experiment Results:", results)
 ```
 
 
-
-## Dataset Management
-Manage datasets efficiently for your projects:
-
-```py
-from ragaai_catalyst import Dataset
-
-# Initialize Dataset management for a specific project
-dataset_manager = Dataset(project_name="project_name")
-
-# List existing datasets
-datasets = dataset_manager.list_datasets()
-print("Existing Datasets:", datasets)
-
-# Create a dataset from trace
-dataset_manager.create_from_trace(
-    dataset_name='Test-dataset-1',
-    filter_list=[
-        {"name": "llm_model", "values": ["gpt-3.5-turbo", "gpt-4"]},
-        {"name": "prompt_length", "lte": 27, "gte": 23}
-    ]
-)
-
-# Create a dataset from CSV
-dataset_manager.create_from_csv(
-    csv_path='path/to/your.csv',
-    dataset_name='MyDataset',
-    schema_mapping={'column1': 'schema_element1', 'column2': 'schema_element2'}
-)
-```
-
-For more detailed information on Dataset Management, including CSV schema handling and advanced usage, please refer to the [Dataset Management documentation](docs/dataset_management.md).
-
-## Prompt Management
+### Prompt Management
 
 Manage and use prompts efficiently in your projects:
 
 ```py
-from ragaai_catalyst.prompt_manager import PromptManager
+from ragaai_catalyst import PromptManager
 
 # Initialize PromptManager
-prompt_manager = PromptManager("your-project-name")
+prompt_manager = PromptManager(project_name="Test-RAG-App-1")
 
 # List available prompts
 prompts = prompt_manager.list_prompts()
 print("Available prompts:", prompts)
 
-# Get a specific prompt
+# Get default prompt by prompt_name
 prompt_name = "your_prompt_name"
 prompt = prompt_manager.get_prompt(prompt_name)
+
+# Get specific version of prompt by prompt_name and version
+prompt_name = "your_prompt_name"
+version = "v1"
+prompt = prompt_manager.get_prompt(prompt_name,version)
+
+# Get variables in a prompt
+variable = prompt.get_variables()
+print("variable:",variable)
+
+# Get prompt content
+prompt_content = prompt.get_prompt_content()
+print("prompt_content:", prompt_content)
 
 # Compile a prompt with variables
 compiled_prompt = prompt.compile(query="What's the weather?", context="sunny", llm_response="It's sunny today")
 print("Compiled prompt:", compiled_prompt)
 
-# Get prompt parameters
-parameters = prompt.get_parameters()
-print("Prompt parameters:", parameters)
+# implement compiled_prompt with openai
+import openai
+def get_openai_response(prompt):
+    client = openai.OpenAI()
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=prompt
+    )
+    return response.choices[0].message.content
+openai_response = get_openai_response(compiled_prompt)
+print("openai_response:", openai_response)
+
+# implement compiled_prompt with litellm
+import litellm
+def get_litellm_response(prompt):
+    response = litellm.completion(
+        model="gpt-4o-mini",
+        messages=prompt
+    )
+    return response.choices[0].message.content
+litellm_response = get_litellm_response(compiled_prompt)
+print("litellm_response:", litellm_response)
+
+```
+For more detailed information on Prompt Management, please refer to the [Prompt Management documentation](docs/prompt_management.md).
+
+
+### Synthetic Data Generation
+
+```py
+from ragaai_catalyst import SyntheticDataGeneration
+
+# Initialize Synthetic Data Generation
+sdg = SyntheticDataGeneration()
+
+# Process your file
+text = sdg.process_document(input_data="file_path")
+
+# Generate results
+result = sdg.generate_qna(text, question_type ='simple',model_config={"provider":"openai","model":"gpt-4o-mini"},n=20)
+
+# Get supported Q&A types
+sdg.get_supported_qna()
+
+# Get supported providers
+sdg.get_supported_providers()
 ```
 
-For more detailed information on Prompt Management, please refer to the [Prompt Management documentation](docs/prompt_management.md).
+
 
 
 
