@@ -52,13 +52,18 @@ class GuardExecutor:
 
     
     def __call__(self,messages,prompt_params,model_params,llm_caller='litellm'):
-        context_var = self.field_map['context']
+        for key in self.field_map:
+            if key not in ['prompt','response']:
+                if key not in prompt_params:
+                    raise ValueError(f'{key} added as field map but not passed as prompt parameter')
+        context_var = self.field_map.get('context',None)
         prompt = None
         for msg in messages:
             if 'role' in msg:
                 if msg['role'] == 'user':
                     prompt = msg['content']
-                    msg['content'] += '\n' + prompt_params[context_var]
+                    if not context_var:
+                        msg['content'] += '\n' + prompt_params[context_var]
         doc = dict()
         doc['prompt'] = prompt
         doc['context'] = prompt_params[context_var]
@@ -75,6 +80,7 @@ class GuardExecutor:
         doc['response'] = llm_response['choices'][0].message.content
         if 'instruction' in self.field_map:
             instruction = prompt_params[self.field_map['instruction']]
+            doc['instruction'] = instruction
         response = self.execute_deployment(doc)
         if response and response['data']['status'] == 'FAIL':
             print('Guardrail deployment run retured failed status, replacing with alternate response')
