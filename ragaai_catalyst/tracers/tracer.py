@@ -17,7 +17,7 @@ from .instrumentators import (
     LlamaIndexInstrumentor,
 )
 from .utils import get_unique_key
-from .llamaindex_callback import LlamaIndexTracer
+# from .llamaindex_callback import LlamaIndexTracer
 from ..ragaai_catalyst import RagaAICatalyst
 
 logger = logging.getLogger(__name__)
@@ -95,6 +95,8 @@ class Tracer:
             self._upload_task = None
         elif tracer_type == "llamaindex":
             self._upload_task = None
+            from .llamaindex_callback import LlamaIndexTracer
+
         else:
             raise ValueError (f"Currently supported tracer types are 'langchain' and 'llamaindex'.")
 
@@ -153,6 +155,7 @@ class Tracer:
             print(f"Tracer started for project: {self.project_name}")
             return self
         elif self.tracer_type == "llamaindex":
+            from .llamaindex_callback import LlamaIndexTracer
             return LlamaIndexTracer(self._pass_user_data()).start()
             
 
@@ -168,6 +171,7 @@ class Tracer:
             self._upload_task = self._run_async(self._upload_traces())
             return "Trace upload initiated. Use get_upload_status() to check the status."
         elif self.tracer_type == "llamaindex":
+            from .llamaindex_callback import LlamaIndexTracer
             return LlamaIndexTracer().stop()
 
     def get_upload_status(self):
