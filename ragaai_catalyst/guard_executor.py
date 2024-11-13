@@ -54,7 +54,7 @@ class GuardExecutor:
     def __call__(self,messages,prompt_params,model_params,llm_caller='litellm'):
         for key in self.field_map:
             if key not in ['prompt','response']:
-                if key not in prompt_params:
+                if self.field_map[key] not in prompt_params:
                     raise ValueError(f'{key} added as field map but not passed as prompt parameter')
         context_var = self.field_map.get('context',None)
         prompt = None
