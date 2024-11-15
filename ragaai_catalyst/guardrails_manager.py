@@ -24,14 +24,14 @@ class GuardrailsManager:
         self.project_id = [_["id"] for _ in project_name_with_id if _["name"]==self.project_name][0]
 
 
-    def _get_project_list(self):
+    def _get_project_list(self, num_projects=1000):
         """
         Retrieve the list of projects and their IDs from the API.
         
         :return: A tuple containing a list of project names and a list of dictionaries with project IDs and names.
         """
         headers = {'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'}
-        response = requests.request("GET", f"{self.base_url}/v2/llm/projects?size=12&page=0", headers=headers, timeout=self.timeout)
+        response = requests.request("GET", f"{self.base_url}/v2/llm/projects?size={num_projects}", headers=headers, timeout=self.timeout)
         project_content = response.json()["data"]["content"]
         list_project = [_["name"] for _ in project_content]
         project_name_with_id = [{"id": _["id"], "name": _["name"]} for _ in project_content]
