@@ -331,7 +331,7 @@ gdm.add_guardrails(deployment_id, guardrails, guardrails_config)
 from ragaai_catalyst import GuardExecutor
 
 # Initialise GuardExecutor with required params and Evaluate
-executor = GuardExecutor(deployment_id,gdm,field_map={'prompt':'Prompt','context':'document','response':'Response'})
+executor = GuardExecutor(deployment_id,gdm,field_map={'context':'document'})
 
 
 message={'role':'user',
