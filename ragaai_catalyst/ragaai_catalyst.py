@@ -287,7 +287,7 @@ class RagaAICatalyst:
     def get_project_id(self, project_name):
         pass
 
-    def list_projects(self, num_projects=100):
+    def list_projects(self, num_projects=99999):
         """
         Retrieves a list of projects with the specified number of projects.
 

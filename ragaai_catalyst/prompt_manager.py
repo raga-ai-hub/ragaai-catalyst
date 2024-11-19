@@ -23,7 +23,7 @@ class PromptManager:
         self.project_name = project_name
         self.base_url = f"{RagaAICatalyst.BASE_URL}/playground/prompt"
         self.timeout = 10
-        self.size = 100 #Number of projects to fetch
+        self.size = 99999 #Number of projects to fetch
 
         try:
             response = requests.get(
