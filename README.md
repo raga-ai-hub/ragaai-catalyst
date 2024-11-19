@@ -1,6 +1,6 @@
 # RagaAI Catalyst
 
-RagaAI Catalyst is a powerful tool for managing and optimizing LLM projects. It provides functionalities for project management, trace recording, and experiment management, allowing you to fine-tune and evaluate your LLM applications effectively.
+RagaAI Catalyst is a comprehensive platform designed to enhance the management and optimization of LLM projects. It offers a wide range of features, including project management, dataset management, evaluation management, trace management, prompt management, synthetic data generation, and guardrail management. These functionalities enable you to efficiently evaluate, and safeguard your LLM applications.
 
 ## Table of Contents
 
@@ -15,6 +15,7 @@ RagaAI Catalyst is a powerful tool for managing and optimizing LLM projects. It 
     - [Trace Management](#trace-management)
     - [Prompt Management](#prompt-management)
     - [Synthetic Data Generation](#synthetic-data-generation)
+    - [Guardrail Management](#guardrail-management)
 
 ## Installation
 
@@ -106,6 +107,7 @@ evaluation = Evaluation(
 evaluation.list_metrics()
 
 # Add metrics to the experiment
+
 schema_mapping={
     'Query': 'prompt',
     'response': 'response',
@@ -163,8 +165,12 @@ tracer = Tracer(
 
 # Your code here
 
+
 # Stop the trace recording
 tracer.stop()
+
+# Get upload status
+tracer.get_upload_status()
 ```
 
 
@@ -199,7 +205,7 @@ print("variable:",variable)
 prompt_content = prompt.get_prompt_content()
 print("prompt_content:", prompt_content)
 
-# Compile a prompt with variables
+# Compile the prompt with variables
 compiled_prompt = prompt.compile(query="What's the weather?", context="sunny", llm_response="It's sunny today")
 print("Compiled prompt:", compiled_prompt)
 
@@ -242,7 +248,9 @@ sdg = SyntheticDataGeneration()
 text = sdg.process_document(input_data="file_path")
 
 # Generate results
-result = sdg.generate_qna(text, question_type ='simple',model_config={"provider":"openai","model":"gpt-4o-mini"},n=20)
+result = sdg.generate_qna(text, question_type ='complex',model_config={"provider":"openai","model":"openai/gpt-3.5-turbo"},n=5)
+
+print(result.head())
 
 # Get supported Q&A types
 sdg.get_supported_qna()
@@ -253,5 +261,87 @@ sdg.get_supported_providers()
 
 
 
+### Guardrail Management
+
+```py
+from ragaai_catalyst import GuardrailsManager
+
+# Initialize Guardrails Manager
+gdm = GuardrailsManager(project_name=project_name)
+
+# Get list of Guardrails available
+guardrails_list = gdm.list_guardrails()
+print('guardrails_list:', guardrails_list)
+
+# Get list of fail condition for guardrails
+fail_conditions = gdm.list_fail_condition()
+print('fail_conditions;', fail_conditions)
+
+#Get list of deployment ids
+deployment_list = gdm.list_deployment_ids()
+print('deployment_list:', deployment_list)
+
+# Get specific deployment id with guardrails information
+deployment_id_detail = gdm.get_deployment(17)
+print('deployment_id_detail:', deployment_id_detail)
+
+# Add guardrails to a deployment id
+guardrails_config = {"guardrailFailConditions": ["FAIL"],
+                     "deploymentFailCondition": "ALL_FAIL",
+                     "alternateResponse": "Your alternate response"}
+
+guardrails = [
+    {
+      "displayName": "Response_Evaluator",
+      "name": "Response Evaluator",
+      "config":{
+          "mappings": [{
+                        "schemaName": "Text",
+                        "variableName": "Response"
+                    }],
+          "params": {
+                    "isActive": {"value": False},
+                    "isHighRisk": {"value": True},
+                    "threshold": {"eq": 0},
+                    "competitors": {"value": ["Google","Amazon"]}
+                }
+      }
+    },
+    {
+      "displayName": "Regex_Check",
+      "name": "Regex Check",
+      "config":{
+          "mappings": [{
+                        "schemaName": "Text",
+                        "variableName": "Response"
+                    }],
+          "params":{
+              "isActive": {"value": False},
+              "isHighRisk": {"value": True},
+              "threshold": {"lt1": 1}
+          }
+      }
+    }
+]
+
+gdm.add_guardrails(deployment_id, guardrails, guardrails_config)
 
 
+# Import GuardExecutor
+from ragaai_catalyst import GuardExecutor
+
+# Initialise GuardExecutor with required params and Evaluate
+executor = GuardExecutor(deployment_id,gdm,field_map={'context':'document'})
+
+
+message={'role':'user',
+         'content':'What is the capital of France'
+        }
+prompt_params={'document':' France'}
+
+model_params = {'temperature':.7,'model':'gpt-4o-mini'}
+llm_caller = 'litellm'
+
+executor([message],prompt_params,model_params,llm_caller)
+
+```

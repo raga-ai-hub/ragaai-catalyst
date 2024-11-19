@@ -16,7 +16,7 @@ class Evaluation:
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
         self.timeout = 10
         self.jobId = None
-        self.num_projects=100
+        self.num_projects=99999
 
         try:
             response = requests.get(

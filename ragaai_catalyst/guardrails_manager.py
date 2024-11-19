@@ -13,7 +13,7 @@ class GuardrailsManager:
         """
         self.project_name = project_name
         self.timeout = 10
-        self.num_projects = 100
+        self.num_projects = 99999
         self.deployment_name = "NA"
         self.deployment_id = "NA"
         self.base_url = f"{RagaAICatalyst.BASE_URL}"
@@ -31,7 +31,7 @@ class GuardrailsManager:
         :return: A tuple containing a list of project names and a list of dictionaries with project IDs and names.
         """
         headers = {'Authorization': f'Bearer {os.getenv("RAGAAI_CATALYST_TOKEN")}'}
-        response = requests.request("GET", f"{self.base_url}/v2/llm/projects?size=12&page=0", headers=headers, timeout=self.timeout)
+        response = requests.request("GET", f"{self.base_url}/v2/llm/projects?size={self.num_projects}", headers=headers, timeout=self.timeout)
         project_content = response.json()["data"]["content"]
         list_project = [_["name"] for _ in project_content]
         project_name_with_id = [{"id": _["id"], "name": _["name"]} for _ in project_content]
