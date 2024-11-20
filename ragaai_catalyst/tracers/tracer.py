@@ -17,7 +17,7 @@ from .instrumentators import (
     LlamaIndexInstrumentor,
 )
 from .utils import get_unique_key
-
+# from .llamaindex_callback import LlamaIndexTracer
 from ..ragaai_catalyst import RagaAICatalyst
 
 logger = logging.getLogger(__name__)
@@ -86,13 +86,19 @@ class Tracer:
             logger.error(f"Failed to retrieve projects list: {e}")
             raise
 
+        if tracer_type == "langchain":
+            self.raga_client = RagaExporter(project_name=self.project_name, dataset_name=self.dataset_name)
 
-        self.raga_client = RagaExporter(project_name=self.project_name, dataset_name=self.dataset_name)
+            self._tracer_provider = self._setup_provider()
+            self._instrumentor = self._setup_instrumentor(tracer_type)
+            self.is_instrumented = False
+            self._upload_task = None
+        elif tracer_type == "llamaindex":
+            self._upload_task = None
+            from .llamaindex_callback import LlamaIndexTracer
 
-        self._tracer_provider = self._setup_provider()
-        self._instrumentor = self._setup_instrumentor(tracer_type)
-        self.is_instrumented = False
-        self._upload_task = None
+        else:
+            raise ValueError (f"Currently supported tracer types are 'langchain' and 'llamaindex'.")
 
     def _improve_metadata(self, metadata, tracer_type):
         if metadata is None:
@@ -142,34 +148,44 @@ class Tracer:
 
     def start(self):
         """Start the tracer."""
-        if not self.is_instrumented:
-            self._instrumentor().instrument(tracer_provider=self._tracer_provider)
-            self.is_instrumented = True
-        print(f"Tracer started for project: {self.project_name}")
-        return self
+        if self.tracer_type == "langchain":
+            if not self.is_instrumented:
+                self._instrumentor().instrument(tracer_provider=self._tracer_provider)
+                self.is_instrumented = True
+            print(f"Tracer started for project: {self.project_name}")
+            return self
+        elif self.tracer_type == "llamaindex":
+            from .llamaindex_callback import LlamaIndexTracer
+            return LlamaIndexTracer(self._pass_user_data()).start()
+            
 
     def stop(self):
         """Stop the tracer and initiate trace upload."""
-        if not self.is_instrumented:
-            logger.warning("Tracer was not started. No traces to upload.")
-            return "No traces to upload"
+        if self.tracer_type == "langchain":
+            if not self.is_instrumented:
+                logger.warning("Tracer was not started. No traces to upload.")
+                return "No traces to upload"
 
-        print("Stopping tracer and initiating trace upload...")
-        self._cleanup()
-        self._upload_task = self._run_async(self._upload_traces())
-        return "Trace upload initiated. Use get_upload_status() to check the status."
+            print("Stopping tracer and initiating trace upload...")
+            self._cleanup()
+            self._upload_task = self._run_async(self._upload_traces())
+            return "Trace upload initiated. Use get_upload_status() to check the status."
+        elif self.tracer_type == "llamaindex":
+            from .llamaindex_callback import LlamaIndexTracer
+            return LlamaIndexTracer().stop()
 
     def get_upload_status(self):
         """Check the status of the trace upload."""
-        if self._upload_task is None:
-            return "No upload task in progress."
-        if self._upload_task.done():
-            try:
-                result = self._upload_task.result()
-                return f"Upload completed: {result}"
-            except Exception as e:
-                return f"Upload failed: {str(e)}"
-        return "Upload in progress..."
+        if self.tracer_type == "langchain":
+            if self._upload_task is None:
+                return "No upload task in progress."
+            if self._upload_task.done():
+                try:
+                    result = self._upload_task.result()
+                    return f"Upload completed: {result}"
+                except Exception as e:
+                    return f"Upload failed: {str(e)}"
+            return "Upload in progress..."
 
     def _run_async(self, coroutine):
         """Run an asynchronous coroutine in a separate thread."""
@@ -246,3 +262,21 @@ class Tracer:
         # Reset instrumentation flag
         self.is_instrumented = False
         # Note: We're not resetting all attributes here to allow for upload status checking
+    def _pass_user_data(self):
+        return {"project_name":self.project_name, 
+                "project_id": self.project_id,
+                "dataset_name":self.dataset_name, 
+                "trace_user_detail" : {
+                    "project_id": self.project_id,
+                    "trace_id": "",
+                    "session_id": None,
+                    "trace_type": self.tracer_type,
+                    "traces": [],
+                    "metadata": self.metadata,
+                    "pipeline": {
+                        "llm_model": self.pipeline["llm_model"],
+                        "vector_store": self.pipeline["vector_store"],
+                        "embed_model": self.pipeline["embed_model"]
+                        }
+                    }
+                }

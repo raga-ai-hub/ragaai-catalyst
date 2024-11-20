@@ -6,6 +6,8 @@ from .dataset import Dataset
 from .prompt_manager import PromptManager
 from .evaluation import Evaluation
 from .synthetic_data_generation import SyntheticDataGeneration
+from .guardrails_manager import GuardrailsManager
+from .guard_executor import GuardExecutor
 
 
-__all__ = ["Experiment", "RagaAICatalyst", "Tracer", "PromptManager", "Evaluation","SyntheticDataGeneration"]
+__all__ = ["Experiment", "RagaAICatalyst", "Tracer", "PromptManager", "Evaluation","SyntheticDataGeneration", "GuardrailsManager"]
