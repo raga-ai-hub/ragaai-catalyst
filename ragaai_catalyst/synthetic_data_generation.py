@@ -289,6 +289,7 @@ class SyntheticDataGeneration:
 
         # Extract the content from the response
         content = response.choices[0].message.content
+        content = content.replace('\n', '').replace('```json','').replace('```', '').strip()
 
         # Clean the response if needed (remove any prefix before the JSON list)
         list_start_index = content.find('[')

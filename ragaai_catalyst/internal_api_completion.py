@@ -36,7 +36,7 @@ def api_completion(messages, model_config, kwargs):
                     raise ValueError(response["error"]["message"])
                 else:
                     result=  response["choices"][0]["message"]["content"]
-                    response1 = result.replace('\n', '')
+                    response1 = result.replace('\n', '').replace('```json','').replace('```', '').strip()
                     try:
                         json_data = json.loads(response1)
                         df = pd.DataFrame(json_data)
