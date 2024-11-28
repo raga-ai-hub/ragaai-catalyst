@@ -432,7 +432,12 @@ class PromptObject:
         Returns:
             dict: A dictionary of parameters found in the prompt text.
         """
-        parameters = {param["name"]: self._convert_value(param["value"], param["type"]) for param in self.parameters}
+        parameters = {}
+        for param in self.parameters:
+            if "value" in param:
+                parameters[param["name"]] = self._convert_value(param["value"], param["type"])
+            else:
+                parameters[param["name"]] = ""
         parameters["model"] = self.model
         return parameters    
     
