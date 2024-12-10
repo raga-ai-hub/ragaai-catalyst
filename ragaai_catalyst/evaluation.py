@@ -242,7 +242,7 @@ class Evaluation:
 
     def _update_base_json(self, metrics):
         metrics_schema_response = self._get_metrics_schema_response()
-        sub_providers = ["openai","azure","gemini","groq"]
+        sub_providers = ["openai","azure","gemini","groq","anthropic","bedrock"]
         metricParams = []
         for metric in metrics:
             base_json = self._get_metricParams()
@@ -252,7 +252,7 @@ class Evaluation:
             for key, value in metric["config"].items():
                 #checking if provider is one of the allowed providers
                 if key.lower()=="provider" and value.lower() not in sub_providers:
-                    raise ValueError("Enter a valid provider name. The following Provider names are supported: OpenAI, Azure, Gemini, Groq")
+                    raise ValueError("Enter a valid provider name. The following Provider names are supported: openai, azure, gemini, groq, anthropic, bedrock")
     
                 if key.lower()=="threshold":
                     if len(value)>1:
